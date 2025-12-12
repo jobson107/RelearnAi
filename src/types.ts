@@ -114,6 +114,7 @@ export interface AppState {
   roadmap?: RoadmapData | null;
   conceptMap?: ConceptMapData | null;
   studyAdvice?: StudyAdvice | null;
+  isFallback?: boolean; // New flag for fallback mode
 }
 
 export interface SessionProgress {

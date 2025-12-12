@@ -59,6 +59,7 @@
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
     <style>
       :root {
         --color-bg: #f8fafc;
@@ -227,6 +228,17 @@
       .erasing-effect {
         animation: eraser-wipe 0.6s cubic-bezier(0.55, 0.085, 0.68, 0.53) forwards;
         pointer-events: none;
+      }
+
+      /* KaTeX Overrides for Dark Mode */
+      .katex {
+        font-size: 1.1em !important;
+        color: inherit !important;
+      }
+      .katex-display {
+        margin: 1em 0 !important;
+        overflow-x: auto;
+        overflow-y: hidden;
       }
 
     </style>

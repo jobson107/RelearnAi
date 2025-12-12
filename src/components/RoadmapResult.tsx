@@ -1,9 +1,9 @@
 
-// src/components/RoadmapResult.tsx
 import React, { useState, useEffect } from 'react';
 import { RoadmapNode } from '../utils/roadmapGenerator';
 import { ChevronDown, ChevronUp, CheckCircle2, Circle, Clock, GripVertical, Download, Calendar, ArrowUp, ArrowDown, RotateCcw, Trophy, Sparkles, Play, FileText, ExternalLink } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { MathText } from './MathText';
 
 interface RoadmapResultProps {
   nodes: RoadmapNode[];
@@ -174,7 +174,7 @@ export const RoadmapResult: React.FC<RoadmapResultProps> = ({ nodes, onUpdateNod
                              )}
                         </div>
                         <h3 className={`text-lg font-bold text-slate-800 dark:text-slate-100 ${node.progressPct === 100 ? 'line-through opacity-50' : ''}`}>
-                            {node.title}
+                            <MathText text={node.title} />
                         </h3>
                     </div>
 
@@ -227,7 +227,7 @@ export const RoadmapResult: React.FC<RoadmapResultProps> = ({ nodes, onUpdateNod
                                         {task.isComplete && <CheckCircle2 className="w-3 h-3 text-white" />}
                                     </div>
                                     <span className={`text-sm ${task.isComplete ? 'line-through text-slate-500' : 'text-slate-700 dark:text-slate-200'}`}>
-                                        {task.text}
+                                        <MathText text={task.text} />
                                     </span>
                                     <span className="ml-auto text-xs text-slate-400">{task.estMin}m</span>
                                 </div>

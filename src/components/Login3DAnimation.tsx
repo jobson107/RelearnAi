@@ -62,7 +62,6 @@ export const Login3DAnimation: React.FC<Login3DAnimationProps> = ({ triggerBurst
 
     const handleMouseMove = (e: MouseEvent) => {
       const rect = canvas.getBoundingClientRect();
-      // Calculate normalized mouse position (-1 to 1) relative to canvas center
       mouseRef.current = {
         x: (e.clientX - rect.left - rect.width / 2) / (rect.width / 2),
         y: (e.clientY - rect.top - rect.height / 2) / (rect.height / 2)
@@ -77,15 +76,11 @@ export const Login3DAnimation: React.FC<Login3DAnimationProps> = ({ triggerBurst
       const centerY = canvas.height / 2;
 
       // Smooth rotation logic
-      // Auto rotate + Parallax based on mouse
       rotationY += 0.005;
       const targetRotX = mouseRef.current.y * 0.5;
       const targetRotY = mouseRef.current.x * 0.5;
       
-      // Interpolate current parallax rotation
       rotationX += (targetRotX - rotationX) * 0.05;
-      // We add auto-rotation to Y, so we add parallax offset implicitly by not overwriting rotationY completely, 
-      // but simpler to just use mouse for tilt (X) and let Y spin.
       
       // Draw Core "Glass" Glow
       const gradient = ctx.createRadialGradient(centerX, centerY, 10, centerX, centerY, radius * 1.5);
@@ -97,16 +92,14 @@ export const Login3DAnimation: React.FC<Login3DAnimationProps> = ({ triggerBurst
       ctx.arc(centerX, centerY, radius * 1.5, 0, Math.PI * 2);
       ctx.fill();
 
-      // Sort particles by Z depth for correct occlusion/layering
+      // Sort particles by Z depth
       particlesRef.current.sort((a, b) => b.z - a.z);
 
       particlesRef.current.forEach(p => {
-        // 1. Rotation Logic (Euler angles)
-        // Rotate around Y
+        // Rotation Logic
         let x1 = p.x * Math.cos(rotationY) - p.z * Math.sin(rotationY);
         let z1 = p.z * Math.cos(rotationY) + p.x * Math.sin(rotationY);
         
-        // Rotate around X (Tilt)
         let y1 = p.y * Math.cos(rotationX) - z1 * Math.sin(rotationX);
         let z2 = z1 * Math.cos(rotationX) + p.y * Math.sin(rotationX);
 
@@ -115,12 +108,11 @@ export const Login3DAnimation: React.FC<Login3DAnimationProps> = ({ triggerBurst
             p.x += p.vx;
             p.y += p.vy;
             p.z += p.vz;
-            // Dampen velocity to return/stop
             p.vx *= 0.95;
             p.vy *= 0.95;
             p.vz *= 0.95;
 
-            // Return force (spring back to original shape)
+            // Return force
             const dx = p.baseX - p.x;
             const dy = p.baseY - p.y;
             const dz = p.baseZ - p.z;
@@ -137,15 +129,12 @@ export const Login3DAnimation: React.FC<Login3DAnimationProps> = ({ triggerBurst
         const y2d = y1 * scale + centerY;
 
         // Draw Particle
-        const alpha = Math.max(0.1, Math.min(1, (z2 + radius) / (2 * radius))); // Fade back particles
+        const alpha = Math.max(0.1, Math.min(1, (z2 + radius) / (2 * radius)));
         ctx.globalAlpha = alpha;
         ctx.fillStyle = p.color;
         ctx.beginPath();
         ctx.arc(x2d, y2d, p.size * scale, 0, Math.PI * 2);
         ctx.fill();
-        
-        // Optional: Connect lines for "mesh" look if close
-        // (Skipped for performance/clean look as requested "orb particles")
       });
       ctx.globalAlpha = 1;
 
@@ -171,7 +160,6 @@ export const Login3DAnimation: React.FC<Login3DAnimationProps> = ({ triggerBurst
             p.vz = (Math.random() - 0.5) * 15;
         });
 
-        // Reset burst state after animation allows return
         setTimeout(() => {
             burstStateRef.current = false;
         }, 1000);
@@ -186,7 +174,6 @@ export const Login3DAnimation: React.FC<Login3DAnimationProps> = ({ triggerBurst
             height={300}
             className="w-[300px] h-[300px]"
         />
-        {/* Soft Bloom overlay in CSS for extra glow */}
         <div className="absolute inset-0 bg-indigo-500/20 blur-[60px] rounded-full transform scale-50 pointer-events-none"></div>
     </div>
   );

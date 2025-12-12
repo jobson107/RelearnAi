@@ -1,9 +1,10 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, Bot, User, Loader2, Sparkles, ExternalLink, Minimize2, Maximize2 } from 'lucide-react';
-import { createTutorChat } from '../services/geminiService';
+import { MessageCircle, X, Send, Bot, User, Loader2, Sparkles, ExternalLink, Mic, MicOff, Headphones } from 'lucide-react';
+import { createTutorChat, startVoiceChat, VoiceChatControl } from '../services/geminiService';
 import { ChatMessage, WebResource } from '../types';
 import { GenerateContentResponse } from '@google/genai';
+import { MathText } from './MathText';
 
 export const ChatBot: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -17,11 +18,16 @@ export const ChatBot: React.FC = () => {
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  // Relax type to avoid SDK conflicts if 'Chat' isn't explicitly exported as type
   const [chatSession, setChatSession] = useState<any | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Initialize Chat Session on mount
+  // Voice Mode State
+  const [isVoiceMode, setIsVoiceMode] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState<'connecting' | 'connected' | 'error' | 'disconnected'>('disconnected');
+  const [micVolume, setMicVolume] = useState(0);
+  const voiceControlRef = useRef<VoiceChatControl | null>(null);
+
+  // Initialize Text Chat Session on mount
   useEffect(() => {
     try {
       const session = createTutorChat();
@@ -31,10 +37,36 @@ export const ChatBot: React.FC = () => {
     }
   }, []);
 
+  // Handle Voice Mode Toggling
+  useEffect(() => {
+    if (isVoiceMode) {
+        // Start Live Session
+        const control = startVoiceChat(
+            (level) => setMicVolume(level),
+            (status) => setVoiceStatus(status)
+        );
+        voiceControlRef.current = control;
+    } else {
+        // Stop Live Session
+        if (voiceControlRef.current) {
+            voiceControlRef.current.stop();
+            voiceControlRef.current = null;
+        }
+        setVoiceStatus('disconnected');
+        setMicVolume(0);
+    }
+
+    return () => {
+        if (voiceControlRef.current) {
+            voiceControlRef.current.stop();
+        }
+    };
+  }, [isVoiceMode]);
+
   // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isOpen]);
+  }, [messages, isOpen, isVoiceMode]);
 
   const handleSendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -57,7 +89,6 @@ export const ChatBot: React.FC = () => {
       const result: GenerateContentResponse = await chatSession.sendMessage({ message: userText });
       const responseText = result.text || "I couldn't find an answer to that.";
       
-      // Extract grounding sources if any
       const sources: WebResource[] = [];
       const chunks = result.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
       chunks.forEach((chunk: any) => {
@@ -91,33 +122,31 @@ export const ChatBot: React.FC = () => {
   };
 
   const renderMarkdown = (text: string) => {
-    // Simple parser for bolding and bullet points in chat
     return text.split('\n').map((line, i) => {
         const key = `${i}-${line.substring(0, 10)}`;
         if (line.startsWith('* ') || line.startsWith('- ')) {
-            return <li key={key} className="ml-4 list-disc">{renderBold(line.substring(2))}</li>
+            return <li key={key} className="ml-4 list-disc">{renderBoldAndMath(line.substring(2))}</li>
         }
         if (line.match(/^\d+\./)) {
-             return <div key={key} className="ml-4 mb-1">{renderBold(line)}</div>
+             return <div key={key} className="ml-4 mb-1">{renderBoldAndMath(line)}</div>
         }
         if (line.trim() === '') return <br key={key} />;
-        return <p key={key} className="mb-1">{renderBold(line)}</p>;
+        return <p key={key} className="mb-1">{renderBoldAndMath(line)}</p>;
     });
   };
 
-  const renderBold = (text: string) => {
+  const renderBoldAndMath = (text: string) => {
       const parts = text.split(/(\*\*.*?\*\*)/g);
       return parts.map((part, i) => {
           if (part.startsWith('**') && part.endsWith('**')) {
-              return <strong key={i} className="text-indigo-600 dark:text-indigo-300">{part.slice(2, -2)}</strong>;
+              return <strong key={i} className="text-indigo-600 dark:text-indigo-300"><MathText text={part.slice(2, -2)} /></strong>;
           }
-          return part;
+          return <MathText key={i} text={part} />;
       });
   };
 
   return (
     <>
-      {/* Floating Toggle Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`fixed bottom-6 right-6 z-50 p-4 rounded-full shadow-2xl transition-all duration-300 hover:scale-110 flex items-center justify-center ${isOpen ? 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300' : 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white animate-bounce'}`}
@@ -125,30 +154,70 @@ export const ChatBot: React.FC = () => {
         {isOpen ? <X className="w-6 h-6" /> : <MessageCircle className="w-7 h-7" />}
       </button>
 
-      {/* Chat Window */}
       <div 
         className={`fixed bottom-24 right-6 w-[90vw] md:w-[400px] h-[600px] max-h-[75vh] glass-panel bg-white/80 dark:bg-slate-800/90 backdrop-blur-xl border border-white/50 dark:border-slate-700 rounded-[2rem] shadow-2xl z-50 flex flex-col overflow-hidden transition-all duration-300 origin-bottom-right transform ${isOpen ? 'scale-100 opacity-100' : 'scale-0 opacity-0 pointer-events-none'}`}
       >
         
-        {/* Header */}
         <div className="p-4 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 dark:from-indigo-500/20 dark:to-purple-500/20 border-b border-white/50 dark:border-slate-700 flex items-center justify-between">
              <div className="flex items-center gap-3">
-                 <div className="p-2 bg-white dark:bg-slate-700 rounded-full shadow-sm">
-                     <Bot className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                 <div className={`p-2 rounded-full shadow-sm transition-colors ${isVoiceMode ? 'bg-rose-500 text-white animate-pulse' : 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400'}`}>
+                     {isVoiceMode ? <Headphones className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
                  </div>
                  <div>
-                     <h3 className="font-bold text-slate-800 dark:text-white">ReLearn AI Tutor</h3>
+                     <h3 className="font-bold text-slate-800 dark:text-white">ReLearn AI</h3>
                      <div className="flex items-center gap-1.5">
-                         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                         <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wide">Search Active</span>
+                         <span className={`w-2 h-2 rounded-full ${isVoiceMode ? 'bg-rose-500' : 'bg-emerald-500'} animate-pulse`}></span>
+                         <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wide">
+                             {isVoiceMode ? (voiceStatus === 'connected' ? 'Live Audio' : 'Connecting...') : 'Chat Active'}
+                         </span>
                      </div>
                  </div>
              </div>
-             <Sparkles className="w-4 h-4 text-indigo-400" />
+             
+             {/* Voice Toggle */}
+             <button 
+                onClick={() => setIsVoiceMode(!isVoiceMode)}
+                className={`p-2 rounded-full transition-all ${isVoiceMode ? 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400' : 'bg-white/50 dark:bg-slate-700/50 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                title={isVoiceMode ? "End Call" : "Start Voice Call"}
+             >
+                 {isVoiceMode ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+             </button>
         </div>
 
-        {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-slate-50/50 dark:bg-slate-900/30">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-slate-50/50 dark:bg-slate-900/30 relative">
+            
+            {/* Voice Mode Overlay */}
+            {isVoiceMode && (
+                <div className="absolute inset-0 z-20 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md flex flex-col items-center justify-center animate-in fade-in duration-300">
+                    <div className="relative mb-8">
+                        {/* Pulsing Rings */}
+                        <div className="absolute inset-0 rounded-full bg-indigo-500 opacity-20 animate-ping" style={{ animationDuration: '2s' }}></div>
+                        <div className="absolute inset-0 rounded-full bg-purple-500 opacity-20 animate-ping delay-300" style={{ animationDuration: '2s' }}></div>
+                        
+                        {/* Core Visualizer */}
+                        <div 
+                            className="w-32 h-32 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 shadow-2xl flex items-center justify-center transition-transform duration-100 ease-out"
+                            style={{ transform: `scale(${1 + micVolume * 0.5})` }}
+                        >
+                            <Headphones className="w-12 h-12 text-white" />
+                        </div>
+                    </div>
+                    
+                    <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">
+                        {voiceStatus === 'connecting' ? 'Connecting...' : 'Listening...'}
+                    </h3>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 text-center max-w-[200px]">
+                        Speak naturally. Synapse is listening and will respond in real-time.
+                    </p>
+                    
+                    {voiceStatus === 'error' && (
+                        <p className="mt-4 text-rose-500 text-sm font-bold bg-rose-50 px-3 py-1 rounded-full">
+                            Connection Failed. Try again.
+                        </p>
+                    )}
+                </div>
+            )}
+
             {messages.map((msg) => (
                 <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                     <div 
@@ -166,7 +235,6 @@ export const ChatBot: React.FC = () => {
                             msg.text
                         )}
 
-                        {/* Search Sources */}
                         {msg.sources && msg.sources.length > 0 && (
                             <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Sources Found:</p>
@@ -201,7 +269,6 @@ export const ChatBot: React.FC = () => {
             <div ref={messagesEndRef} />
         </div>
 
-        {/* Input Area */}
         <div className="p-4 bg-white dark:bg-slate-800 border-t border-slate-100 dark:border-slate-700">
             <form onSubmit={handleSendMessage} className="relative">
                 <input
@@ -209,11 +276,12 @@ export const ChatBot: React.FC = () => {
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
                     placeholder="Ask about study tips or search web..."
-                    className="w-full bg-slate-100 dark:bg-slate-900 border border-transparent focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl pl-4 pr-12 py-3.5 text-sm outline-none transition-all dark:text-white"
+                    disabled={isVoiceMode}
+                    className="w-full bg-slate-100 dark:bg-slate-900 border border-transparent focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl pl-4 pr-12 py-3.5 text-sm outline-none transition-all dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 <button 
                     type="submit" 
-                    disabled={!inputValue.trim() || isTyping}
+                    disabled={!inputValue.trim() || isTyping || isVoiceMode}
                     className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                     {isTyping ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}

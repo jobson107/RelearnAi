@@ -17,6 +17,7 @@ import { PomodoroTimer } from './components/PomodoroTimer';
 import RoadmapPage from './components/RoadmapPage';
 import { VideoSearchPanel } from './components/VideoSearchPanel';
 import { ConceptGraph } from './components/ConceptGraph';
+import { StatusBanner } from './components/StatusBanner';
 import { generateSummary, generateQuiz, generateVisualAnalogy, generateFlashcards, generateDeepDive, generateStudyRoadmap, generateConceptMap, generateStudyAdvice } from './services/geminiService';
 import { saveSession, getSessions, updateSessionProgress, updateDailyProgress, getSchedule, updateSessionData } from './services/storageService';
 import { AppState, StudySession, AnalysisDepth, VideoResult, WebResource } from './types';
@@ -55,7 +56,8 @@ const App: React.FC = () => {
     deepDive: null,
     roadmap: null,
     conceptMap: null,
-    studyAdvice: null
+    studyAdvice: null,
+    isFallback: false
   });
 
   const [loadingState, setLoadingState] = useState({
@@ -97,7 +99,7 @@ const App: React.FC = () => {
   const handleLogout = () => { setIsAuthenticated(false); setAppState({ content: '', summary: null, visualUrl: null, visualPrompt: null, quiz: null, flashcards: null, deepDive: null, roadmap: null, conceptMap: null, studyAdvice: null }); setActiveSessionId(null); };
   
   const handleNewTopic = () => {
-    setAppState({ content: '', summary: null, visualUrl: null, visualPrompt: null, quiz: null, flashcards: null, deepDive: null, roadmap: null, conceptMap: null, studyAdvice: null });
+    setAppState({ content: '', summary: null, visualUrl: null, visualPrompt: null, quiz: null, flashcards: null, deepDive: null, roadmap: null, conceptMap: null, studyAdvice: null, isFallback: false });
     setLoadingState({ summary: false, visual: false, quiz: false, flashcards: false, deepDive: false, roadmap: false, conceptMap: false, studyAdvice: false });
     setActiveSessionId(null);
     setInputKey(prev => prev + 1);
@@ -121,8 +123,8 @@ const App: React.FC = () => {
     if(appState.content) {
        setLoadingState(prev => ({ ...prev, visual: true }));
        generateVisualAnalogy(appState.content)
-       .then(({ imageUrl, prompt }) => {
-           setAppState(prev => ({ ...prev, visualUrl: imageUrl, visualPrompt: prompt }));
+       .then(({ data }) => {
+           setAppState(prev => ({ ...prev, visualUrl: data.imageUrl, visualPrompt: data.prompt }));
            setLoadingState(prev => ({ ...prev, visual: false }));
        })
        .catch(() => setLoadingState(prev => ({ ...prev, visual: false })));
@@ -131,31 +133,50 @@ const App: React.FC = () => {
 
   const handleAnalyze = async (text: string, depth: AnalysisDepth, includeVisuals: boolean) => {
     setActiveSessionId(null);
-    setAppState(prev => ({ ...prev, content: text, summary: null, visualUrl: null, quiz: null, flashcards: null, deepDive: null, roadmap: null, conceptMap: null, studyAdvice: null }));
+    setAppState(prev => ({ ...prev, content: text, summary: null, visualUrl: null, quiz: null, flashcards: null, deepDive: null, roadmap: null, conceptMap: null, studyAdvice: null, isFallback: false }));
     setSaveStatus('saved');
     
     // Parallel Execution
     setLoadingState(prev => ({ ...prev, summary: true, quiz: true, flashcards: true, studyAdvice: true }));
     
-    generateSummary(text, depth).then(s => { setAppState(p => ({ ...p, summary: s })); setLoadingState(p => ({ ...p, summary: false })); });
-    generateStudyAdvice(text).then(a => { setAppState(p => ({ ...p, studyAdvice: a })); setLoadingState(p => ({ ...p, studyAdvice: false })); });
-    generateQuiz(text, depth).then(q => { setAppState(p => ({ ...p, quiz: q })); setLoadingState(p => ({ ...p, quiz: false })); });
-    generateFlashcards(text).then(f => { setAppState(p => ({ ...p, flashcards: f })); setLoadingState(p => ({ ...p, flashcards: false })); });
+    // Helper to process response and check fallback
+    const processResult = (result: {data: any, isFallback: boolean}, key: keyof AppState) => {
+        if (result.isFallback) setAppState(prev => ({ ...prev, isFallback: true }));
+        setAppState(prev => ({ ...prev, [key]: result.data }));
+        setLoadingState(prev => ({ ...prev, [key]: false }));
+    };
+
+    generateSummary(text, depth).then(r => processResult(r, 'summary'));
+    generateStudyAdvice(text).then(r => processResult(r, 'studyAdvice'));
+    generateQuiz(text, depth).then(r => processResult(r, 'quiz'));
+    generateFlashcards(text).then(r => processResult(r, 'flashcards'));
 
     if (includeVisuals) {
         setLoadingState(p => ({ ...p, visual: true }));
-        generateVisualAnalogy(text).then(v => { setAppState(p => ({ ...p, visualUrl: v.imageUrl, visualPrompt: v.prompt })); setLoadingState(p => ({ ...p, visual: false })); });
+        generateVisualAnalogy(text).then(r => {
+            if (r.isFallback) setAppState(prev => ({ ...prev, isFallback: true }));
+            setAppState(p => ({ ...p, visualUrl: r.data.imageUrl, visualPrompt: r.data.prompt }));
+            setLoadingState(p => ({ ...p, visual: false }));
+        });
     }
 
     // Generate Concept Map (New)
     setLoadingState(p => ({ ...p, conceptMap: true }));
-    generateConceptMap(text).then(cm => { setAppState(p => ({ ...p, conceptMap: cm })); setLoadingState(p => ({ ...p, conceptMap: false })); });
+    generateConceptMap(text).then(r => processResult(r, 'conceptMap'));
 
     if (depth === AnalysisDepth.DEEP_DIVE) {
         setLoadingState(p => ({ ...p, deepDive: true, roadmap: true }));
-        generateDeepDive(text, depth).then(d => { setAppState(p => ({ ...p, deepDive: d })); setLoadingState(p => ({ ...p, deepDive: false })); });
-        generateStudyRoadmap(text).then(r => { setAppState(p => ({ ...p, roadmap: r })); setLoadingState(p => ({ ...p, roadmap: false })); });
+        generateDeepDive(text, depth).then(r => processResult(r, 'deepDive'));
+        generateStudyRoadmap(text).then(r => processResult(r, 'roadmap'));
     }
+  };
+
+  const handleRetryCloud = () => {
+      // Force retry by enabling cloud consent temporarily if needed and re-running analyze
+      localStorage.setItem('relearn_cloud_consent', 'true');
+      if (appState.content) {
+          handleAnalyze(appState.content, AnalysisDepth.NOTES_ONLY, true); // Re-run analysis
+      }
   };
 
   const handleInsertVideo = (video: VideoResult) => {
@@ -247,10 +268,19 @@ const App: React.FC = () => {
         </div>
       </nav>
 
-      <main className="pt-32 px-6 max-w-[1400px] mx-auto space-y-12 min-h-screen">
+      <main className="pt-20 px-6 max-w-[1400px] mx-auto space-y-8 min-h-screen">
+        
+        {/* Status Banner for Fallback */}
+        <StatusBanner 
+            isFallback={!!appState.isFallback} 
+            onRetry={handleRetryCloud} 
+            isRetrying={isAnyLoading} 
+            className="mb-4 rounded-xl"
+        />
+
         {currentView === 'study' && (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className={`transition-all duration-700 ease-in-out ${hasContent ? 'opacity-0 h-0 overflow-hidden py-0' : 'opacity-100 py-12'}`}>
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 pt-4">
+                <div className={`transition-all duration-700 ease-in-out ${hasContent ? 'opacity-0 h-0 overflow-hidden py-0' : 'opacity-100 py-8'}`}>
                     <div className="text-center mb-12 animate-in fade-in slide-in-from-top-8 duration-1000">
                         <div className="inline-block mb-4 px-4 py-1.5 rounded-full bg-white/60 dark:bg-slate-800/60 border border-white/40 dark:border-slate-700/50 backdrop-blur-md text-sm text-indigo-600 dark:text-indigo-400 font-bold shadow-sm">✨ The Ultimate Entrance Exam Companion</div>
                         <h1 className="text-5xl md:text-7xl font-bold text-slate-800 dark:text-white mb-6 tracking-tight leading-tight">Master Your <br /><span className="gradient-text">Study Material</span></h1>
@@ -295,7 +325,17 @@ const App: React.FC = () => {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="min-h-[400px] h-full">
-                                    {(appState.visualUrl || loadingState.visual) ? <Visualizer imageUrl={appState.visualUrl} prompt={appState.visualPrompt} isLoading={loadingState.visual} onRegenerate={handleRegenerateVisual} /> : <div className="glass-panel rounded-[2rem] p-1 h-full flex items-center justify-center bg-white/40 dark:bg-slate-800/40 border border-white/50 dark:border-slate-700"><EyeOff className="w-8 h-8 opacity-50"/></div>}
+                                    {(appState.visualUrl || loadingState.visual) ? (
+                                        <Visualizer 
+                                            imageUrl={appState.visualUrl} 
+                                            prompt={appState.visualPrompt} 
+                                            isLoading={loadingState.visual} 
+                                            onRegenerate={handleRegenerateVisual}
+                                            onImageUpdate={(newUrl) => setAppState(prev => ({ ...prev, visualUrl: newUrl }))} 
+                                        />
+                                    ) : (
+                                        <div className="glass-panel rounded-[2rem] p-1 h-full flex items-center justify-center bg-white/40 dark:bg-slate-800/40 border border-white/50 dark:border-slate-700"><EyeOff className="w-8 h-8 opacity-50"/></div>
+                                    )}
                                 </div>
                                 <div className="min-h-[400px] h-full">
                                     {(appState.deepDive || loadingState.deepDive) ? <ResourceModule data={appState.deepDive} isLoading={loadingState.deepDive} /> : <div className="glass-panel rounded-[2rem] p-1 h-full flex items-center justify-center bg-white/40 dark:bg-slate-800/40 border border-white/50 dark:border-slate-700"><Globe className="w-6 h-6 opacity-50"/></div>}

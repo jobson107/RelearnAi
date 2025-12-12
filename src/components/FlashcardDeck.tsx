@@ -1,6 +1,8 @@
+
 import React, { useState } from 'react';
 import { Layers, RotateCw, ChevronLeft, ChevronRight, BookOpen } from 'lucide-react';
 import { Flashcard } from '../types';
+import { MathText } from './MathText';
 
 interface FlashcardDeckProps {
   flashcards: Flashcard[] | null;
@@ -117,9 +119,9 @@ export const FlashcardDeck: React.FC<FlashcardDeckProps> = ({ flashcards, isLoad
                     {/* Scrollable Content Container */}
                     <div className="flex-1 w-full overflow-y-auto custom-scrollbar pt-16 pb-12 px-6">
                         <div className="min-h-full flex flex-col items-center justify-center">
-                             <p className="text-xl md:text-2xl font-bold text-center leading-relaxed break-words whitespace-normal max-w-full">
-                                {currentCard.front}
-                            </p>
+                             <div className="text-xl md:text-2xl font-bold text-center leading-relaxed break-words whitespace-normal max-w-full">
+                                <MathText text={currentCard.front} />
+                            </div>
                         </div>
                     </div>
 
@@ -145,9 +147,9 @@ export const FlashcardDeck: React.FC<FlashcardDeckProps> = ({ flashcards, isLoad
                     {/* Scrollable Content Container */}
                     <div className="flex-1 w-full overflow-y-auto custom-scrollbar pt-16 pb-8 px-6">
                         <div className="min-h-full flex flex-col items-center justify-center">
-                            <p className="text-lg text-slate-700 dark:text-slate-200 text-center leading-relaxed font-medium break-words whitespace-normal max-w-full">
-                                {currentCard.back}
-                            </p>
+                            <div className="text-lg text-slate-700 dark:text-slate-200 text-center leading-relaxed font-medium break-words whitespace-normal max-w-full">
+                                <MathText text={currentCard.back} />
+                            </div>
                         </div>
                     </div>
 
