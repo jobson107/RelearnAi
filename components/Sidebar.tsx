@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { X, LayoutGrid, BookOpen, Calendar, Target, GraduationCap, Map, Sparkles } from 'lucide-react';
+import { X, LayoutGrid, BookOpen, Calendar, Target, GraduationCap, Map, Sparkles, Play } from 'lucide-react';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -8,9 +8,10 @@ interface SidebarProps {
   currentView: string;
   onNavigate: (view: 'study' | 'library' | 'schedule' | 'goals' | 'roadmap') => void;
   onGenerateRoadmap?: () => void;
+  onOpenVideoPanel?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentView, onNavigate, onGenerateRoadmap }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentView, onNavigate, onGenerateRoadmap, onOpenVideoPanel }) => {
   const menuItems = [
     { id: 'study', label: 'Study Studio', icon: LayoutGrid },
     { id: 'library', label: 'Library', icon: BookOpen },
@@ -88,6 +89,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentView, 
                     </button>
                 );
             })}
+            
+            {onOpenVideoPanel && (
+              <button
+                onClick={() => {
+                  onOpenVideoPanel();
+                  onClose();
+                }}
+                className="w-full flex items-center gap-4 px-4 py-4 rounded-xl font-bold transition-all duration-200 group text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
+              >
+                <Play className="w-5 h-5 text-slate-400 group-hover:text-indigo-500 dark:group-hover:text-indigo-400" />
+                <span>AI Video Studio</span>
+              </button>
+            )}
         </div>
 
         <div className="absolute bottom-8 left-0 w-full px-6">

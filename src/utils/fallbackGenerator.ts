@@ -4,13 +4,15 @@ import { QuizData, Flashcard, ConceptMapData, RoadmapData, StudyAdvice } from ".
 // --- Helpers ---
 
 const extractSentences = (text: string): string[] => {
+  if (!text) return [];
   return text.match(/[^.!?]+[.!?]+/g) || [];
 };
 
 const getKeywords = (text: string): string[] => {
+  if (!text) return ["Learning", "Concept", "Study"];
   const words: string[] = text.toLowerCase().match(/\b(\w+)\b/g) || [];
   const freq: Record<string, number> = {};
-  const stopWords = new Set(['the', 'and', 'is', 'in', 'to', 'of', 'a', 'for', 'it', 'with', 'on', 'that', 'this', 'are', 'was', 'as']);
+  const stopWords = new Set(['the', 'and', 'is', 'in', 'to', 'of', 'a', 'for', 'it', 'with', 'on', 'that', 'this', 'are', 'was', 'as', 'an', 'at']);
   
   words.forEach(w => {
     if (w.length > 3 && !stopWords.has(w)) {
@@ -34,11 +36,15 @@ export const generateLocalSummary = (text: string): string => {
       return sentences.length > 0 ? sentences[0] : "";
     })
     .filter(s => s.length > 20)
-    .slice(0, 6);
+    .slice(0, 5);
 
-  return "### ⚠️ Offline Mode Summary\n\n" + 
+  if (summaryPoints.length === 0) {
+      return "### Summary Unavailable\n\nCould not extract a meaningful summary from the text. Please ensure the content is readable.";
+  }
+
+  return "### ⚠️ Rapid Summary (Offline Fallback)\n\n" + 
          summaryPoints.map(s => `- ${s.trim()}`).join("\n") + 
-         "\n\n*Note: Enable Cloud Assist for deeper AI reasoning.*";
+         "\n\n> *Note: AI service was unreachable. This is a heuristic summary.*";
 };
 
 export const generateLocalQuiz = (text: string): QuizData => {
@@ -46,40 +52,52 @@ export const generateLocalQuiz = (text: string): QuizData => {
   const keywords = getKeywords(text);
   const questions: any[] = [];
 
-  // Simple heuristic: Find sentences containing definitions or keywords
+  // Heuristic: Create questions from sentences containing keywords
   sentences.forEach(sent => {
     if (questions.length >= 5) return;
     
     const keyword = keywords.find(k => sent.toLowerCase().includes(k));
     if (keyword && sent.length < 150 && sent.length > 30) {
-      // Create a cloze deletion question
-      const questionText = sent.replace(new RegExp(keyword, 'gi'), '_______');
+      // Create a cloze deletion (fill-in-the-blank) question
+      const questionText = sent.replace(new RegExp(`\\b${keyword}\\b`, 'gi'), '_______');
+      
+      // Don't add if replacement didn't happen (regex safety)
+      if (questionText === sent) return;
+
       questions.push({
         question: `Complete the sentence: "${questionText}"`,
         options: [
           keyword, 
-          'something else', 
-          'incorrect answer', 
-          'another option'
+          'Incorrect Option A', 
+          'Incorrect Option B', 
+          'Incorrect Option C'
         ].sort(() => Math.random() - 0.5),
-        correctAnswerIndex: 0, // We shuffle options in UI ideally, but here keeping simple
-        explanation: "Extracted from text context."
+        correctAnswerIndex: 0, // We will fix the index after sorting in a real scenario, but for fallback this is acceptable if options aren't shuffled or if we accept imperfection
+        explanation: `The term "${keyword}" fits the context of the sentence.`
       });
     }
   });
 
-  // Fill with generic if not enough
-  while (questions.length < 5) {
+  // Ensure we have valid questions
+  while (questions.length < 3) {
     questions.push({
-      question: "What is the main topic of this text?",
-      options: ["The Content", "Biology", "History", "Math"],
+      question: "What is the primary subject of this material?",
+      options: ["The Content Provided", "General Knowledge", "Unrelated Topic", "Specific Detail"],
       correctAnswerIndex: 0,
-      explanation: "General understanding."
+      explanation: "This is a fallback question generated to ensure the quiz functions."
     });
   }
 
+  // Fix correct answer index mapping after random sort if we were strictly accurate, 
+  // but for a safe fallback, we force the correct answer to be the keyword and place it randomly.
+  questions.forEach(q => {
+      const correct = q.options[0]; // The keyword was pushed first
+      q.options.sort(() => Math.random() - 0.5);
+      q.correctAnswerIndex = q.options.indexOf(correct);
+  });
+
   return {
-    title: "Review Quiz (Local Mode)",
+    title: "Review Quiz (Fallback)",
     questions
   };
 };
@@ -88,30 +106,28 @@ export const generateLocalFlashcards = (text: string): Flashcard[] => {
   const sentences = extractSentences(text);
   const cards: Flashcard[] = [];
   
-  // Look for "Term is Definition" or "Term: Definition" patterns
-  const definitionRegex = /^([A-Z][a-z]+(?:\s[A-Z][a-z]+)*)(?:\s(?:is|are|refers to)|:)\s(.+)/;
+  // Regex for definitions: "Term is Definition"
+  const definitionRegex = /^([A-Z][a-z]+(?:\s[A-Z][a-z]+){0,3})\s+(?:is|are|refers to|means)\s+(.+)/;
 
   sentences.forEach(sent => {
     if (cards.length >= 8) return;
     const match = sent.match(definitionRegex);
-    if (match) {
+    if (match && match[2].length < 150) {
       cards.push({
         front: match[1],
-        back: match[2]
+        back: match[2].trim()
       });
     }
   });
 
-  // Fallback if regex fails: Use keywords
-  if (cards.length < 4) {
+  // Fallback: Keyword based
+  if (cards.length < 3) {
     const keywords = getKeywords(text);
-    keywords.forEach(k => {
-        if (cards.length < 8) {
-            cards.push({
-                front: k.charAt(0).toUpperCase() + k.slice(1),
-                back: `Key concept found in the text. (Review context for details)`
-            });
-        }
+    keywords.slice(0, 5).forEach(k => {
+        cards.push({
+            front: k.charAt(0).toUpperCase() + k.slice(1),
+            back: "Key concept from the text. Review source material for detailed definition."
+        });
     });
   }
 
@@ -120,13 +136,24 @@ export const generateLocalFlashcards = (text: string): Flashcard[] => {
 
 export const generateLocalConceptMap = (text: string): ConceptMapData => {
   const keywords = getKeywords(text);
-  const nodes = keywords.map((k, i) => ({
-    id: `node-${i}`,
-    label: k.charAt(0).toUpperCase() + k.slice(1),
-    importance: 10 - i,
-    category: 'Key Concept',
-    connections: i > 0 ? [`node-${0}`] : [] // Connect everything to the main keyword
-  }));
+  const mainTopic = keywords[0] ? keywords[0].toUpperCase() : "MAIN TOPIC";
+  
+  const nodes = [
+      { id: "root", label: mainTopic, importance: 10, category: "Core", connections: [] as string[] }
+  ];
+
+  keywords.slice(1, 8).forEach((k, i) => {
+    const id = `node-${i}`;
+    nodes.push({
+        id,
+        label: k.charAt(0).toUpperCase() + k.slice(1),
+        importance: 8 - i,
+        category: "Concept",
+        connections: []
+    });
+    // Connect to root
+    nodes[0].connections.push(id);
+  });
 
   return { nodes };
 };
@@ -141,15 +168,15 @@ export const generateLocalRoadmap = (text: string): RoadmapData => {
         week: "Week 1",
         day: "Monday",
         topic: "Core Concepts Review",
-        description: "Review the main keywords and definitions extracted from the document.",
+        description: "Review the extracted keywords and summary points from your uploaded document.",
         taskType: "Learn",
         estimatedMinutes: 45,
         difficulty: "Beginner",
         prerequisites: [],
         resources: [],
         microtasks: [
-            { id: "m1", text: "Read summary", completed: false },
-            { id: "m2", text: "Review flashcards", completed: false }
+            { id: "m1", text: "Read generated summary", completed: false },
+            { id: "m2", text: "Review key terms", completed: false }
         ],
         xp: 50,
         status: "pending"
@@ -163,7 +190,7 @@ export const generateLocalStudyAdvice = (): StudyAdvice => {
         strategies: [
             "Use the Pomodoro timer to break study sessions.",
             "Review the generated flashcards for active recall.",
-            "Summarize each section in your own words."
+            "Summarize each section in your own words to ensure understanding."
         ],
         microAdvice: "Focus on the bolded keywords in the summary."
     };

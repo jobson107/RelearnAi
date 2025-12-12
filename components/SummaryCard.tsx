@@ -1,12 +1,15 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Volume2, FileText, Pause, Loader2 } from 'lucide-react';
 import { playTextToSpeech } from '../services/geminiService';
+import { StudyAdvice } from '../types';
 
 interface SummaryCardProps {
   summary: string;
+  advice?: StudyAdvice | null;
 }
 
-export const SummaryCard: React.FC<SummaryCardProps> = ({ summary }) => {
+export const SummaryCard: React.FC<SummaryCardProps> = ({ summary, advice }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);

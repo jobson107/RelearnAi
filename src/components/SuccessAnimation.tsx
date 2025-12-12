@@ -2,6 +2,7 @@
 import React, { useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { GraduationCap, Sparkles } from 'lucide-react';
+import { playSuccess, playGlitter } from '../utils/soundEffects';
 
 interface SuccessAnimationProps {
   onComplete: () => void;
@@ -9,6 +10,10 @@ interface SuccessAnimationProps {
 
 export const SuccessAnimation: React.FC<SuccessAnimationProps> = ({ onComplete }) => {
   useEffect(() => {
+    // Play sounds
+    playSuccess();
+    setTimeout(() => playGlitter(), 200);
+
     // Sequence Configuration
     const duration = 2200;
     const end = Date.now() + duration;

@@ -1,5 +1,4 @@
 
-// src/components/RoadmapPage.tsx
 import React, { useState, useEffect } from 'react';
 import '../styles/roadmap.css';
 import { GenerateButton } from './GenerateButton';
@@ -11,6 +10,7 @@ import { ToastProvider, useToast } from './Toast';
 import { generateRoadmap, getAnalysis, RoadmapConfig, RoadmapNode, ExamGoal, Strategy, ContentAnalysis } from '../utils/roadmapGenerator';
 import { Map, Trophy, Target, Calendar, Clock, Flame, ChevronRight, Layers } from 'lucide-react';
 import { RoadmapData } from '../types';
+import { playComplete, playSuccess } from '../utils/soundEffects';
 
 const RoadmapPageContent: React.FC<{ initialData?: RoadmapData | null }> = ({ initialData }) => {
   const [step, setStep] = useState<'form' | 'generating' | 'success' | 'complete'>('form');
@@ -45,7 +45,7 @@ const RoadmapPageContent: React.FC<{ initialData?: RoadmapData | null }> = ({ in
                   isComplete: mt.completed
               })),
               prerequisites: item.prerequisites,
-              resources: item.resources,
+              resources: item.resources, // Direct assignment as they are compatible in src context
               progressPct: item.status === 'completed' ? 100 : item.status === 'in-progress' ? 50 : 0,
               xpValue: item.xp,
               isExpanded: false,
@@ -67,6 +67,7 @@ const RoadmapPageContent: React.FC<{ initialData?: RoadmapData | null }> = ({ in
     setFileCount(count);
     if (mergedContent) {
         addToast(`${count} files merged and ready for analysis.`, 'success');
+        playSuccess();
     }
   };
 
@@ -92,6 +93,7 @@ const RoadmapPageContent: React.FC<{ initialData?: RoadmapData | null }> = ({ in
     setStep('success');
     setShowConfetti(true);
     addToast("Roadmap generated successfully!", "success");
+    playComplete();
     
     // 4. Reveal Roadmap after animation
     setTimeout(() => {
@@ -108,6 +110,7 @@ const RoadmapPageContent: React.FC<{ initialData?: RoadmapData | null }> = ({ in
         const newNodes = generateRoadmap({ ...config, seed: Date.now() });
         setNodes(newNodes);
         setStep('complete');
+        playSuccess();
     }, 800);
   };
 

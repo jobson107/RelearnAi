@@ -19,9 +19,10 @@ import { VideoSearchPanel } from './components/VideoSearchPanel';
 import { ConceptGraph } from './components/ConceptGraph';
 import { StatusBanner } from './components/StatusBanner';
 import { generateSummary, generateQuiz, generateVisualAnalogy, generateFlashcards, generateDeepDive, generateStudyRoadmap, generateConceptMap, generateStudyAdvice } from './services/geminiService';
-import { saveSession, getSessions, updateSessionProgress, updateDailyProgress, getSchedule, updateSessionData } from './services/storageService';
+import { saveSession, getSessions } from './services/storageService';
 import { AppState, StudySession, AnalysisDepth, VideoResult, WebResource } from './types';
-import { GraduationCap, Activity, LogOut, Save, Search, Globe, Moon, Sun, EyeOff, Menu, Zap, Upload, Map, X } from 'lucide-react';
+import { playClick, playComplete, playSuccess } from './utils/soundEffects';
+import { GraduationCap, Activity, LogOut, Save, Moon, Sun, EyeOff, Menu, Zap, Play, Globe } from 'lucide-react';
 
 const DRAFT_KEY = 'relearn_draft_state';
 
@@ -61,161 +62,98 @@ const App: React.FC = () => {
   });
 
   const [loadingState, setLoadingState] = useState({
-    summary: false,
-    visual: false,
-    quiz: false,
-    flashcards: false,
-    deepDive: false,
-    roadmap: false,
-    conceptMap: false,
-    studyAdvice: false
+    summary: false, visual: false, quiz: false, flashcards: false, deepDive: false, roadmap: false, conceptMap: false, studyAdvice: false
   });
 
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved'>('idle');
-  
-  // Derived state
   const isAnyLoading = Object.values(loadingState).some(state => state);
   const hasContent = !!appState.content;
 
-  useEffect(() => {
-    if (appState.content) sessionStorage.setItem(DRAFT_KEY, JSON.stringify(appState));
-  }, [appState]);
-
-  useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('relearn_theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('relearn_theme', 'light');
-    }
+  useEffect(() => { if (appState.content) sessionStorage.setItem(DRAFT_KEY, JSON.stringify(appState)); }, [appState]);
+  useEffect(() => { 
+      document.documentElement.classList.toggle('dark', isDarkMode); 
+      localStorage.setItem('relearn_theme', isDarkMode ? 'dark' : 'light'); 
   }, [isDarkMode]);
+  useEffect(() => { if (currentView === 'library') setSessions(getSessions()); }, [currentView]);
 
-  useEffect(() => {
-    if (currentView === 'library') setSessions(getSessions());
-  }, [currentView]);
-
-  const handleLogin = () => { setIsAuthenticated(true); setShowWelcome(true); };
-  const handleLogout = () => { setIsAuthenticated(false); setAppState({ content: '', summary: null, visualUrl: null, visualPrompt: null, quiz: null, flashcards: null, deepDive: null, roadmap: null, conceptMap: null, studyAdvice: null }); setActiveSessionId(null); };
+  const handleLogin = () => { playSuccess(); setIsAuthenticated(true); setShowWelcome(true); };
+  const handleLogout = () => { playClick(); setIsAuthenticated(false); setAppState({ content: '', summary: null, visualUrl: null, visualPrompt: null, quiz: null, flashcards: null, deepDive: null }); };
   
-  const handleNewTopic = () => {
-    setAppState({ content: '', summary: null, visualUrl: null, visualPrompt: null, quiz: null, flashcards: null, deepDive: null, roadmap: null, conceptMap: null, studyAdvice: null, isFallback: false });
-    setLoadingState({ summary: false, visual: false, quiz: false, flashcards: false, deepDive: false, roadmap: false, conceptMap: false, studyAdvice: false });
-    setActiveSessionId(null);
-    setInputKey(prev => prev + 1);
-    setCurrentView('study');
+  const handleLoadDemo = () => {
+      playSuccess();
+      setAppState({
+          content: "Neuroscience: Synaptic Plasticity Demo",
+          summary: "### Synaptic Plasticity\n\n**Synaptic plasticity** is the ability of synapses to strengthen or weaken over time, in response to increases or decreases in their activity. \\[ \\Delta w = \\eta \\cdot x \\cdot y \\] \n\n*   **LTP (Long-Term Potentiation)**: Persistent strengthening of synapses.\n*   **LTD (Long-Term Depression)**: Activity-dependent reduction in efficacy.",
+          visualUrl: "https://images.unsplash.com/photo-1559757175-5700dde675bc?auto=format&fit=crop&w=800&q=80",
+          visualPrompt: "Neuronal network glowing with energy",
+          quiz: { title: "Neuro Quiz", questions: [{ question: "What is the primary mechanism of memory formation?", options: ["LTP", "Mitosis", "Osmosis"], correctAnswerIndex: 0, explanation: "LTP strengthens connections." }] },
+          flashcards: [{ front: "LTP", back: "Long-Term Potentiation" }, { front: "Synapse", back: "Junction between neurons" }],
+          deepDive: { content: "Recent studies link LTP to spatial memory...", resources: [] },
+          conceptMap: { nodes: [{ id: "1", label: "Neuron", importance: 10, category: "Cell", connections: ["2", "3"] }, { id: "2", label: "Synapse", importance: 8, category: "Structure", connections: [] }, { id: "3", label: "Action Potential", importance: 9, category: "Process", connections: ["2"] }] },
+          studyAdvice: { strategies: ["Draw diagrams", "Spaced repetition"], microAdvice: "Focus on the LTP mechanism." },
+          roadmap: { examType: "General", strategy: "Balanced", items: [{ id: "1", week: "Week 1", day: "Monday", topic: "Intro to Neurons", description: "Basics of cell structure", taskType: "Learn", estimatedMinutes: 45, difficulty: "Beginner", prerequisites: [], resources: [], microtasks: [], xp: 50, status: "pending" }] },
+          isFallback: false
+      });
   };
 
   const handleSaveSession = () => {
-    if (!appState.summary) return;
-    setSaveStatus('saved');
-    setTimeout(() => setSaveStatus('idle'), 2000);
-  };
-
-  const handleSearchChange = (query: string) => {
-    setSearchQuery(query);
-    if (query && currentView !== 'library') {
-        setCurrentView('library');
+    playSuccess();
+    if (appState.summary) {
+        saveSession(appState.summary.split('\n')[0] || "Study Session", appState);
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus('idle'), 2000);
     }
   };
-
-  const handleRegenerateVisual = () => {
-    if(appState.content) {
-       setLoadingState(prev => ({ ...prev, visual: true }));
-       generateVisualAnalogy(appState.content)
-       .then(({ data }) => {
-           setAppState(prev => ({ ...prev, visualUrl: data.imageUrl, visualPrompt: data.prompt }));
-           setLoadingState(prev => ({ ...prev, visual: false }));
-       })
-       .catch(() => setLoadingState(prev => ({ ...prev, visual: false })));
-    }
- };
 
   const handleAnalyze = async (text: string, depth: AnalysisDepth, includeVisuals: boolean) => {
+    playClick();
     setActiveSessionId(null);
-    setAppState(prev => ({ ...prev, content: text, summary: null, visualUrl: null, quiz: null, flashcards: null, deepDive: null, roadmap: null, conceptMap: null, studyAdvice: null, isFallback: false }));
+    setAppState(prev => ({ ...prev, content: text, summary: null, visualUrl: null, quiz: null, flashcards: null, conceptMap: null, studyAdvice: null, isFallback: false }));
     setSaveStatus('saved');
     
-    // Parallel Execution
-    setLoadingState(prev => ({ ...prev, summary: true, quiz: true, flashcards: true, studyAdvice: true }));
-    
-    // Helper to process response and check fallback
     const processResult = (result: {data: any, isFallback: boolean}, key: keyof AppState) => {
         if (result.isFallback) setAppState(prev => ({ ...prev, isFallback: true }));
         setAppState(prev => ({ ...prev, [key]: result.data }));
         setLoadingState(prev => ({ ...prev, [key]: false }));
+        if (key === 'summary') playSuccess();
     };
 
+    setLoadingState(p => ({ ...p, summary: true, quiz: true, flashcards: true, conceptMap: true, studyAdvice: true }));
+    
+    // 1. Critical Path: Summary (Immediate)
     generateSummary(text, depth).then(r => processResult(r, 'summary'));
-    generateStudyAdvice(text).then(r => processResult(r, 'studyAdvice'));
-    generateQuiz(text, depth).then(r => processResult(r, 'quiz'));
-    generateFlashcards(text).then(r => processResult(r, 'flashcards'));
+
+    // 2. Secondary: Study Advice (Delayed 4s)
+    setTimeout(() => {
+        generateStudyAdvice(text).then(r => processResult(r, 'studyAdvice'));
+    }, 4000);
+
+    // 3. Heavy: Quiz (Delayed 8s)
+    setTimeout(() => {
+        generateQuiz(text, depth).then(r => processResult(r, 'quiz'));
+    }, 8000);
+
+    // 4. Heavy: Flashcards (Delayed 12s)
+    setTimeout(() => {
+        generateFlashcards(text).then(r => processResult(r, 'flashcards'));
+    }, 12000);
+
+    // 5. Structure: Concept Map (Delayed 16s)
+    setTimeout(() => {
+        generateConceptMap(text).then(r => processResult(r, 'conceptMap'));
+    }, 16000);
 
     if (includeVisuals) {
         setLoadingState(p => ({ ...p, visual: true }));
-        generateVisualAnalogy(text).then(r => {
-            if (r.isFallback) setAppState(prev => ({ ...prev, isFallback: true }));
-            setAppState(p => ({ ...p, visualUrl: r.data.imageUrl, visualPrompt: r.data.prompt }));
-            setLoadingState(p => ({ ...p, visual: false }));
-        });
+        // 6. Visuals (Delayed 20s - avoids heavy competition with logic requests)
+        setTimeout(() => {
+            generateVisualAnalogy(text).then(r => {
+                setAppState(p => ({ ...p, visualUrl: r.data.imageUrl, visualPrompt: r.data.prompt }));
+                setLoadingState(p => ({ ...p, visual: false }));
+                playComplete();
+            });
+        }, 20000);
     }
-
-    // Generate Concept Map (New)
-    setLoadingState(p => ({ ...p, conceptMap: true }));
-    generateConceptMap(text).then(r => processResult(r, 'conceptMap'));
-
-    if (depth === AnalysisDepth.DEEP_DIVE) {
-        setLoadingState(p => ({ ...p, deepDive: true, roadmap: true }));
-        generateDeepDive(text, depth).then(r => processResult(r, 'deepDive'));
-        generateStudyRoadmap(text).then(r => processResult(r, 'roadmap'));
-    }
-  };
-
-  const handleRetryCloud = () => {
-      // Force retry by enabling cloud consent temporarily if needed and re-running analyze
-      localStorage.setItem('relearn_cloud_consent', 'true');
-      if (appState.content) {
-          handleAnalyze(appState.content, AnalysisDepth.NOTES_ONLY, true); // Re-run analysis
-      }
-  };
-
-  const handleInsertVideo = (video: VideoResult) => {
-      // Create WebResource object
-      const newResource: WebResource = {
-          title: video.title,
-          uri: video.url,
-          snippet: video.description,
-          type: 'video',
-          duration: video.duration,
-          thumbnail: video.thumbnail
-      };
-
-      // Add to Roadmap if available (preferred target for videos)
-      if (appState.roadmap && appState.roadmap.items.length > 0) {
-          const newItems = [...appState.roadmap.items];
-          // Add to first item for demo purposes, or finding the most relevant one
-          const targetItem = newItems[0]; 
-          
-          targetItem.resources = [newResource, ...targetItem.resources];
-          
-          setAppState(prev => ({
-              ...prev,
-              roadmap: {
-                  ...prev.roadmap!,
-                  items: newItems
-              }
-          }));
-      } 
-      // Fallback: Add to Deep Dive Resources
-      else if (appState.deepDive) {
-          setAppState(prev => ({
-              ...prev,
-              deepDive: {
-                  ...prev.deepDive!,
-                  resources: [newResource, ...prev.deepDive!.resources]
-              }
-          }));
-      }
   };
 
   if (!isAuthenticated) return <LoginScreen onLogin={handleLogin} />;
@@ -223,34 +161,9 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen text-slate-800 dark:text-slate-100 pb-12 relative overflow-x-hidden animate-in fade-in duration-700 bg-slate-50 dark:bg-slate-900 transition-colors duration-500">
       {showWelcome && <WelcomeOverlay onComplete={() => setShowWelcome(false)} />}
-      
-      <Sidebar 
-        isOpen={isSidebarOpen} 
-        onClose={() => setIsSidebarOpen(false)} 
-        currentView={currentView} 
-        onNavigate={setCurrentView}
-        onGenerateRoadmap={() => setCurrentView('roadmap')}
-        onOpenVideoPanel={() => setIsVideoPanelOpen(true)}
-      />
-      
+      <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} currentView={currentView} onNavigate={setCurrentView} onGenerateRoadmap={() => setCurrentView('roadmap')} onOpenVideoPanel={() => setIsVideoPanelOpen(true)} />
       <PomodoroTimer />
-      <VideoSearchPanel isOpen={isVideoPanelOpen} onClose={() => setIsVideoPanelOpen(false)} appState={appState} onInsertVideo={handleInsertVideo} />
-
-      <div className="fixed bottom-6 right-20 md:right-24 z-40">
-          <button onClick={() => setShowQuickActions(!showQuickActions)} className="w-14 h-14 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full shadow-lg shadow-purple-500/30 flex items-center justify-center text-white hover:scale-110 active:scale-95 transition-all">
-             {showQuickActions ? <X className="w-6 h-6" /> : <Zap className="w-6 h-6 fill-current" />}
-          </button>
-          {showQuickActions && (
-              <div className="absolute bottom-16 right-0 flex flex-col gap-3 animate-in slide-in-from-bottom-4">
-                  <button onClick={() => { setCurrentView('roadmap'); setShowQuickActions(false); }} className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 text-sm font-bold text-slate-700 dark:text-white whitespace-nowrap hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
-                      <span>Create Roadmap</span><div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg text-indigo-600"><Map className="w-4 h-4" /></div>
-                  </button>
-                  <button onClick={() => { handleNewTopic(); setShowQuickActions(false); }} className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 text-sm font-bold text-slate-700 dark:text-white whitespace-nowrap hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
-                      <span>New Upload</span><div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg text-emerald-600"><Upload className="w-4 h-4" /></div>
-                  </button>
-              </div>
-          )}
-      </div>
+      <VideoSearchPanel isOpen={isVideoPanelOpen} onClose={() => setIsVideoPanelOpen(false)} appState={appState} onInsertVideo={() => {}} />
 
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border-b border-white/60 dark:border-slate-800 shadow-sm transition-all duration-300">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between gap-4">
@@ -269,24 +182,19 @@ const App: React.FC = () => {
       </nav>
 
       <main className="pt-20 px-6 max-w-[1400px] mx-auto space-y-8 min-h-screen">
+        <StatusBanner isFallback={!!appState.isFallback} onRetry={() => {}} isRetrying={false} />
         
-        {/* Status Banner for Fallback */}
-        <StatusBanner 
-            isFallback={!!appState.isFallback} 
-            onRetry={handleRetryCloud} 
-            isRetrying={isAnyLoading} 
-            className="mb-4 rounded-xl"
-        />
-
         {currentView === 'study' && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 pt-4">
                 <div className={`transition-all duration-700 ease-in-out ${hasContent ? 'opacity-0 h-0 overflow-hidden py-0' : 'opacity-100 py-8'}`}>
                     <div className="text-center mb-12 animate-in fade-in slide-in-from-top-8 duration-1000">
-                        <div className="inline-block mb-4 px-4 py-1.5 rounded-full bg-white/60 dark:bg-slate-800/60 border border-white/40 dark:border-slate-700/50 backdrop-blur-md text-sm text-indigo-600 dark:text-indigo-400 font-bold shadow-sm">✨ The Ultimate Entrance Exam Companion</div>
                         <h1 className="text-5xl md:text-7xl font-bold text-slate-800 dark:text-white mb-6 tracking-tight leading-tight">Master Your <br /><span className="gradient-text">Study Material</span></h1>
-                        <p className="text-xl text-slate-500 dark:text-slate-400 max-w-2xl mx-auto leading-relaxed">
-                            Upload your syllabus or notes. ReLearn generates <strong className="text-slate-700 dark:text-slate-200">Exam-Level Summaries</strong>, <strong className="text-slate-700 dark:text-slate-200">Active Recall Cards</strong>, and <strong className="text-slate-700 dark:text-slate-200">Deep Research</strong> instantly.
+                        <p className="text-xl text-slate-500 dark:text-slate-400 max-w-2xl mx-auto leading-relaxed mb-8">
+                            Upload your syllabus or notes. ReLearn generates 3D Knowledge Graphs, Exam-Level Summaries, and Animations instantly.
                         </p>
+                        <button onClick={handleLoadDemo} className="px-8 py-3 bg-white dark:bg-slate-800 text-indigo-600 font-bold rounded-full shadow-lg hover:scale-105 transition-transform flex items-center gap-2 mx-auto border border-indigo-100 dark:border-indigo-900">
+                            <Play className="w-5 h-5 fill-current" /> Try Demo (No Upload Needed)
+                        </button>
                     </div>
                     <div className="max-w-4xl mx-auto"><InputSection key={inputKey} onAnalyze={handleAnalyze} isProcessing={isAnyLoading} isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} onViewLibrary={() => setCurrentView('library')} /></div>
                 </div>
@@ -296,46 +204,32 @@ const App: React.FC = () => {
                     <div className="flex flex-col sm:flex-row justify-between items-center animate-in fade-in slide-in-from-top-4 duration-500 mb-8 gap-4">
                         <div className="flex items-center gap-3"><div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg"><Activity className="w-6 h-6 text-indigo-600 dark:text-indigo-400" /></div><h2 className="text-2xl font-bold text-slate-800 dark:text-white">Study Dashboard</h2></div>
                         <div className="flex items-center gap-4">
-                             <button onClick={() => setCurrentView('roadmap')} className="hidden sm:flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-50"><Map className="w-4 h-4" /><span>Create Roadmap</span></button>
                              <button onClick={handleSaveSession} disabled={saveStatus === 'saved'} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all shadow-sm ${saveStatus === 'saved' ? 'bg-emerald-100 text-emerald-700' : 'bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-indigo-600 dark:text-indigo-400 border border-slate-200 dark:border-slate-700'}`}><Save className="w-4 h-4" /><span>{saveStatus === 'saved' ? 'Saved' : 'Save Session'}</span></button>
-                             <button onClick={handleNewTopic} className="text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-indigo-600 underline">New Topic</button>
+                             <button onClick={() => { setAppState({ content: '', summary: null, visualUrl: null, visualPrompt: null, quiz: null, flashcards: null, deepDive: null }); setInputKey(k => k+1); }} className="text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-indigo-600 underline">New Topic</button>
                         </div>
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pb-20 animate-in fade-in slide-in-from-bottom-8 duration-700">
-                        {/* Summary Column */}
                         <div className="lg:col-span-4 min-h-[500px] lg:h-auto h-full">
                             {loadingState.summary ? (
                                 <div className="glass-panel h-full min-h-[500px] rounded-[2rem] flex items-center justify-center bg-white/40 dark:bg-slate-800/40 border border-white/50 dark:border-slate-700"><p className="text-indigo-600 dark:text-indigo-400 font-bold animate-pulse">Structuring Notes...</p></div>
                             ) : ( <SummaryCard summary={appState.summary || ""} advice={appState.studyAdvice} /> )}
                         </div>
 
-                        {/* Right Content Column */}
                         <div className="lg:col-span-8 flex flex-col gap-6">
-                            {/* Concept Map Row */}
                             {(appState.conceptMap || loadingState.conceptMap) && (
                                 <div className="w-full">
                                     {loadingState.conceptMap ? (
                                         <div className="h-[300px] bg-white/40 dark:bg-slate-800/40 rounded-2xl flex items-center justify-center animate-pulse">Building Knowledge Graph...</div>
-                                    ) : (
-                                        <ConceptGraph data={appState.conceptMap!} />
-                                    )}
+                                    ) : ( <ConceptGraph data={appState.conceptMap!} /> )}
                                 </div>
                             )}
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="min-h-[400px] h-full">
                                     {(appState.visualUrl || loadingState.visual) ? (
-                                        <Visualizer 
-                                            imageUrl={appState.visualUrl} 
-                                            prompt={appState.visualPrompt} 
-                                            isLoading={loadingState.visual} 
-                                            onRegenerate={handleRegenerateVisual}
-                                            onImageUpdate={(newUrl) => setAppState(prev => ({ ...prev, visualUrl: newUrl }))} 
-                                        />
-                                    ) : (
-                                        <div className="glass-panel rounded-[2rem] p-1 h-full flex items-center justify-center bg-white/40 dark:bg-slate-800/40 border border-white/50 dark:border-slate-700"><EyeOff className="w-8 h-8 opacity-50"/></div>
-                                    )}
+                                        <Visualizer imageUrl={appState.visualUrl} prompt={appState.visualPrompt} isLoading={loadingState.visual} onRegenerate={() => {}} />
+                                    ) : ( <div className="glass-panel rounded-[2rem] p-1 h-full flex items-center justify-center bg-white/40 dark:bg-slate-800/40 border border-white/50 dark:border-slate-700"><EyeOff className="w-8 h-8 opacity-50"/></div> )}
                                 </div>
                                 <div className="min-h-[400px] h-full">
                                     {(appState.deepDive || loadingState.deepDive) ? <ResourceModule data={appState.deepDive} isLoading={loadingState.deepDive} /> : <div className="glass-panel rounded-[2rem] p-1 h-full flex items-center justify-center bg-white/40 dark:bg-slate-800/40 border border-white/50 dark:border-slate-700"><Globe className="w-6 h-6 opacity-50"/></div>}
@@ -351,14 +245,10 @@ const App: React.FC = () => {
                 )}
             </div>
         )}
-        {currentView === 'library' && <Library sessions={sessions} onLoadSession={(s) => { setAppState(s.data); setActiveSessionId(s.id); setCurrentView('study'); }} onRefresh={() => setSessions(getSessions())} searchQuery={searchQuery} onSearch={handleSearchChange} />}
+        {currentView === 'library' && <Library sessions={sessions} onLoadSession={(s) => { setAppState(s.data); setActiveSessionId(s.id); setCurrentView('study'); }} onRefresh={() => setSessions(getSessions())} searchQuery={searchQuery} onSearch={setSearchQuery} />}
         {currentView === 'schedule' && <Schedule />}
         {currentView === 'goals' && <GoalTracker />}
-        {currentView === 'roadmap' && (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 min-h-[700px]">
-                <RoadmapPage initialData={appState.roadmap} />
-            </div>
-        )}
+        {currentView === 'roadmap' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 min-h-[700px]"><RoadmapPage initialData={appState.roadmap} /></div>}
       </main>
       <ChatBot />
     </div>

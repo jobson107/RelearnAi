@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import '../styles/roadmap.css';
 import { GenerateButton } from './GenerateButton';
 import { RoadmapResult } from './RoadmapResult';
@@ -9,8 +9,9 @@ import { InsightPanel } from './InsightPanel';
 import { ToastProvider, useToast } from './Toast';
 import { generateRoadmap, getAnalysis, RoadmapConfig, RoadmapNode, ExamGoal, Strategy, ContentAnalysis } from '../utils/roadmapGenerator';
 import { Map, Trophy, Target, Calendar, Clock, Flame, ChevronRight, Layers } from 'lucide-react';
+import { RoadmapData } from '../types';
 
-const RoadmapPageContent: React.FC = () => {
+const RoadmapPageContent: React.FC<{ initialData?: RoadmapData | null }> = ({ initialData }) => {
   const [step, setStep] = useState<'form' | 'generating' | 'success' | 'complete'>('form');
   const [config, setConfig] = useState<RoadmapConfig>({
     examGoal: 'General',
@@ -26,6 +27,34 @@ const RoadmapPageContent: React.FC = () => {
   const [fileCount, setFileCount] = useState(0);
   
   const { addToast } = useToast();
+
+  useEffect(() => {
+      if (initialData && initialData.items.length > 0) {
+          // Map RoadmapItem to RoadmapNode
+          const mappedNodes: RoadmapNode[] = initialData.items.map(item => ({
+              id: item.id,
+              title: item.topic,
+              type: item.taskType,
+              estMinutes: item.estimatedMinutes,
+              difficulty: item.difficulty === 'Intermediate' ? 'Moderate' : item.difficulty as any,
+              microtasks: item.microtasks.map(mt => ({
+                  id: mt.id,
+                  text: mt.text,
+                  estMin: 10, // Default duration if not provided
+                  isComplete: mt.completed
+              })),
+              prerequisites: item.prerequisites,
+              resources: item.resources.map(r => r.title), // Simplified map for demo
+              progressPct: item.status === 'completed' ? 100 : item.status === 'in-progress' ? 50 : 0,
+              xpValue: item.xp,
+              isExpanded: false,
+              topicCluster: item.week
+          }));
+          
+          setNodes(mappedNodes);
+          setStep('complete');
+      }
+  }, [initialData]);
 
   // Stats for gamification
   const totalTasks = nodes.reduce((acc, n) => acc + n.microtasks.length, 0);
@@ -271,9 +300,9 @@ const RoadmapPageContent: React.FC = () => {
 };
 
 // Wrapper to provide Toast Context
-const RoadmapPage: React.FC = () => (
+const RoadmapPage: React.FC<{ initialData?: RoadmapData | null }> = ({ initialData }) => (
     <ToastProvider>
-        <RoadmapPageContent />
+        <RoadmapPageContent initialData={initialData} />
     </ToastProvider>
 );
 

@@ -60,7 +60,7 @@ export interface RoadmapItem {
   taskType: 'Learn' | 'Revise' | 'Test';
   estimatedMinutes: number;
   difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
-  prerequisites: string[]; // List of topic names or IDs
+  prerequisites: string[];
   resources: WebResource[];
   microtasks: RoadmapMicrotask[];
   xp: number;
@@ -72,17 +72,35 @@ export interface RoadmapData {
   strategy: string;
   items: RoadmapItem[];
 }
-// ---------------------
 
+// --- Video & Animation Types ---
 export interface VideoResult {
   id: string;
   title: string;
   description: string;
   thumbnail: string;
-  url: string; // URL to video file or YouTube link
+  url: string; 
   source: 'local' | 'youtube' | 'gemini';
   duration?: string;
-  relevance: number; // 0-1
+  relevance: number;
+}
+
+// --- Concept Map Types ---
+export interface ConceptNode {
+  id: string;
+  label: string;
+  importance: number; // 1-10
+  category: string;
+  connections: string[]; // IDs of connected nodes
+}
+
+export interface ConceptMapData {
+  nodes: ConceptNode[];
+}
+
+export interface StudyAdvice {
+  strategies: string[];
+  microAdvice: string;
 }
 
 export interface AppState {
@@ -94,19 +112,21 @@ export interface AppState {
   flashcards: Flashcard[] | null;
   deepDive: DeepDiveData | null;
   roadmap?: RoadmapData | null;
+  conceptMap?: ConceptMapData | null;
+  studyAdvice?: StudyAdvice | null;
+  isFallback?: boolean;
 }
 
 export interface SessionProgress {
   isRead: boolean;
-  quizScore: number | null; // null if not taken
+  quizScore: number | null;
   flashcardsViewed: number;
 }
 
-// Database Types
 export interface StudySession {
   id: string;
   title: string;
-  date: string; // ISO string
+  date: string;
   previewText: string;
   data: AppState;
   progress?: SessionProgress;
@@ -115,45 +135,34 @@ export interface StudySession {
 export interface ScheduleItem {
   id: string;
   subject: string;
-  day: string; // 'Monday', 'Tuesday', etc.
-  startTime: string; // "09:00"
-  endTime: string; // "10:30"
-  color: string; // Tailwind class like 'bg-indigo-500'
+  day: string;
+  startTime: string;
+  endTime: string;
+  color: string;
 }
 
-// Goal Tracking Types
 export interface StudyGoals {
-  sessionsCompleted: number; // Target number of sessions to analyze/read
-  quizzesTaken: number;
-  flashcardsReviewed: number;
-}
-
-export interface DailyProgress {
-  date: string; // ISO Date string (YYYY-MM-DD)
   sessionsCompleted: number;
   quizzesTaken: number;
   flashcardsReviewed: number;
 }
 
-export interface Badge {
-  id: string;
-  name: string;
-  description: string;
-  icon: string; // Lucide icon name or emoji
-  unlocked: boolean;
+export interface DailyProgress {
+  date: string;
+  sessionsCompleted: number;
+  quizzesTaken: number;
+  flashcardsReviewed: number;
 }
 
-// Chat Types
 export interface ChatMessage {
   id: string;
   role: 'user' | 'model';
   text: string;
   timestamp: Date;
   isError?: boolean;
-  sources?: WebResource[]; // For search grounding
+  sources?: WebResource[];
 }
 
-// --- Pomodoro Types ---
 export interface PomodoroSettings {
   focusDuration: number;
   shortBreakDuration: number;
@@ -168,7 +177,7 @@ export interface PomodoroSettings {
 
 export interface PomodoroStats {
   sessionsCompleted: number;
-  totalFocusTime: number; // in minutes
+  totalFocusTime: number;
   currentStreak: number;
-  lastActiveDate: string; // YYYY-MM-DD
+  lastActiveDate: string;
 }

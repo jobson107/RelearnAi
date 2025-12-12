@@ -59,15 +59,10 @@ export const ConceptGraph: React.FC<ConceptGraphProps> = ({ data }) => {
         node.y += node.vy;
         node.vx *= 0.9;
         node.vy *= 0.9;
-        
-        // Bounds check
-        if (node.x < 0 || node.x > canvas.width) node.vx *= -1;
-        if (node.y < 0 || node.y > canvas.height) node.vy *= -1;
       });
 
-      // Draw Links
-      ctx.strokeStyle = 'rgba(99, 102, 241, 0.15)';
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = 'rgba(99, 102, 241, 0.2)';
+      ctx.lineWidth = 2;
       links.forEach(link => {
         const source = nodes[link.source];
         const target = nodes[link.target];
@@ -77,14 +72,13 @@ export const ConceptGraph: React.FC<ConceptGraphProps> = ({ data }) => {
         ctx.stroke();
       });
 
-      // Draw Nodes
       nodes.forEach(node => {
         ctx.beginPath();
-        const radius = Math.max(4, node.importance * 1.2);
+        const radius = Math.max(5, node.importance * 1.5);
         ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
         ctx.fillStyle = node.importance > 7 ? '#8b5cf6' : '#6366f1';
         ctx.shadowColor = ctx.fillStyle;
-        ctx.shadowBlur = 8;
+        ctx.shadowBlur = 10;
         ctx.fill();
         ctx.shadowBlur = 0;
         
@@ -103,7 +97,7 @@ export const ConceptGraph: React.FC<ConceptGraphProps> = ({ data }) => {
   return (
     <div className="w-full h-[300px] bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden relative group">
       <canvas ref={canvasRef} width={800} height={300} className="w-full h-full" />
-      <div className="absolute top-4 left-4 bg-white/80 dark:bg-slate-800/80 backdrop-blur px-3 py-1 rounded-full text-xs font-bold text-slate-500 shadow-sm border border-slate-200 dark:border-slate-700">
+      <div className="absolute top-4 left-4 bg-white/80 dark:bg-slate-800/80 backdrop-blur px-3 py-1 rounded-full text-xs font-bold text-slate-500 shadow-sm">
         Knowledge Graph (AI Generated)
       </div>
     </div>

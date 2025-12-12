@@ -4,6 +4,7 @@ import { BrainCircuit, Check, X, ArrowRight, RotateCcw, Trophy } from 'lucide-re
 import { QuizData } from '../types';
 import confetti from 'canvas-confetti';
 import { MathText } from './MathText';
+import { playSuccess, playError, playClick } from '../utils/soundEffects';
 
 interface QuizModuleProps {
   quiz: QuizData | null;
@@ -16,25 +17,34 @@ export const QuizModule: React.FC<QuizModuleProps> = ({ quiz, isLoading }) => {
   const [showResult, setShowResult] = useState(false);
   const [score, setScore] = useState(0);
 
+  // Safety check: ensure questions exist and have length
+  const hasQuestions = quiz && quiz.questions && quiz.questions.length > 0;
+  const questions = hasQuestions ? quiz.questions : [];
+  const question = questions[currentQuestion];
+
   const handleOptionClick = (index: number) => {
-    if (showResult) return;
+    if (showResult || !question) return;
     setSelectedOption(index);
     setShowResult(true);
     
-    if (index === quiz?.questions[currentQuestion].correctAnswerIndex) {
+    if (index === question.correctAnswerIndex) {
       setScore(s => s + 1);
+      playSuccess();
       confetti({
         particleCount: 150,
         spread: 70,
         origin: { y: 0.6 },
         colors: ['#0ea5e9', '#8b5cf6', '#ec4899']
       });
+    } else {
+        playError();
     }
   };
 
   const nextQuestion = () => {
-    if (!quiz) return;
-    if (currentQuestion < quiz.questions.length - 1) {
+    if (!questions.length) return;
+    playClick();
+    if (currentQuestion < questions.length - 1) {
       setCurrentQuestion(prev => prev + 1);
       setSelectedOption(null);
       setShowResult(false);
@@ -42,6 +52,7 @@ export const QuizModule: React.FC<QuizModuleProps> = ({ quiz, isLoading }) => {
   };
 
   const resetQuiz = () => {
+    playClick();
     setCurrentQuestion(0);
     setSelectedOption(null);
     setShowResult(false);
@@ -69,19 +80,19 @@ export const QuizModule: React.FC<QuizModuleProps> = ({ quiz, isLoading }) => {
     );
   }
 
-  if (!quiz) {
+  if (!hasQuestions || !question) {
     return (
       <div className="glass-panel rounded-[2rem] p-1 h-full flex flex-col shadow-xl bg-white/40">
-         <div className="bg-white/60 backdrop-blur-md rounded-[1.8rem] h-full flex items-center justify-center p-8 text-slate-400 font-medium">
-            Waiting for content...
+         <div className="bg-white/60 backdrop-blur-md rounded-[1.8rem] h-full flex flex-col items-center justify-center p-8 text-slate-400 font-medium">
+            <BrainCircuit className="w-12 h-12 mb-4 opacity-20" />
+            <p>Waiting for quiz content...</p>
          </div>
       </div>
     );
   }
 
-  const question = quiz.questions[currentQuestion];
-  const isFinished = showResult && currentQuestion === quiz.questions.length - 1;
-  const progress = ((currentQuestion + (showResult ? 1 : 0)) / quiz.questions.length) * 100;
+  const isFinished = showResult && currentQuestion === questions.length - 1;
+  const progress = ((currentQuestion + (showResult ? 1 : 0)) / questions.length) * 100;
 
   return (
     <div className="glass-panel rounded-[2rem] p-1 h-full flex flex-col animate-in slide-in-from-right-8 duration-500 shadow-xl bg-white/40">
@@ -99,7 +110,7 @@ export const QuizModule: React.FC<QuizModuleProps> = ({ quiz, isLoading }) => {
                 <Trophy className="w-4 h-4 text-yellow-500" fill="currentColor" />
                 <span className="font-mono text-slate-800 font-bold">{score}</span>
                 <span className="text-slate-400">/</span>
-                <span className="text-slate-500">{quiz.questions.length}</span>
+                <span className="text-slate-500">{questions.length}</span>
             </div>
         </div>
 

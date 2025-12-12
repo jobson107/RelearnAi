@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { X, LayoutGrid, BookOpen, Calendar, Target, GraduationCap, Map, Sparkles, Play, Video } from 'lucide-react';
+import { playClick } from '../utils/soundEffects';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentView, 
       <button
         key={id}
         onClick={() => {
+          playClick();
           if (onClick) onClick();
           else onNavigate(id as any);
           onClose();
@@ -46,7 +48,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentView, 
       {/* Backdrop */}
       <div 
         className={`fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[60] transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-        onClick={onClose}
+        onClick={() => {
+            playClick();
+            onClose();
+        }}
       />
 
       {/* Sidebar Panel */}
@@ -60,7 +65,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentView, 
                 <span className="text-xl font-bold text-slate-800 dark:text-white">Menu</span>
              </div>
              <button 
-                onClick={onClose}
+                onClick={() => {
+                    playClick();
+                    onClose();
+                }}
                 className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors"
              >
                 <X className="w-5 h-5" />
@@ -72,6 +80,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentView, 
             <div className="px-6 pt-6 pb-2 shrink-0">
                 <button
                     onClick={() => {
+                        playClick();
                         onGenerateRoadmap();
                         onClose();
                     }}

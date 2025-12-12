@@ -56,7 +56,7 @@ export const Login3DAnimation: React.FC<{ triggerBurst: boolean }> = ({ triggerB
         
         ctx.beginPath();
         ctx.arc(cx + x1 * scale, cy + p.y * scale, 2 * scale, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(99, 102, 241, ${scale * 0.8})`;
+        ctx.fillStyle = `rgba(120, 100, 255, ${scale * 0.8})`;
         ctx.fill();
       });
       requestRef.current = requestAnimationFrame(animate);

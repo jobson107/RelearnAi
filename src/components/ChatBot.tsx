@@ -1,10 +1,18 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, Bot, User, Loader2, Sparkles, ExternalLink, Mic, MicOff, Headphones } from 'lucide-react';
-import { createTutorChat, startVoiceChat, VoiceChatControl } from '../services/geminiService';
+import { MessageCircle, X, Send, Bot, User, Loader2, Sparkles, ExternalLink, Mic, MicOff, Headphones, Trash2, Volume2, Square } from 'lucide-react';
+import { createTutorChat, startVoiceChat, VoiceChatControl, playTextToSpeech } from '../services/geminiService';
 import { ChatMessage, WebResource } from '../types';
 import { GenerateContentResponse } from '@google/genai';
 import { MathText } from './MathText';
+import { playClick, playBubble } from '../utils/soundEffects';
+
+const SUGGESTED_PROMPTS = [
+    "How does Active Recall work?",
+    "Create a study plan for Biology",
+    "Explain the concept of Entropy",
+    "Tips for staying focused"
+];
 
 export const ChatBot: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -12,7 +20,7 @@ export const ChatBot: React.FC = () => {
     {
       id: 'welcome',
       role: 'model',
-      text: "Hi! I'm ReLearn, your AI Tutor. I can search the web for answers, find research papers, or teach you the *best* ways to study (like Active Recall!). What do you need help with?",
+      text: "Hi! I'm Synapse, your AI Tutor. I can search the web for answers, find research papers, or teach you the *best* ways to study. What do you need help with?",
       timestamp: new Date()
     }
   ]);
@@ -27,15 +35,23 @@ export const ChatBot: React.FC = () => {
   const [micVolume, setMicVolume] = useState(0);
   const voiceControlRef = useRef<VoiceChatControl | null>(null);
 
+  // TTS State
+  const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
+  const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
+
   // Initialize Text Chat Session on mount
   useEffect(() => {
-    try {
-      const session = createTutorChat();
-      setChatSession(session);
-    } catch (e) {
-      console.error("Failed to init chat", e);
-    }
+    initChat();
   }, []);
+
+  const initChat = () => {
+      try {
+        const session = createTutorChat();
+        setChatSession(session);
+      } catch (e) {
+        console.error("Failed to init chat", e);
+      }
+  };
 
   // Handle Voice Mode Toggling
   useEffect(() => {
@@ -63,22 +79,32 @@ export const ChatBot: React.FC = () => {
     };
   }, [isVoiceMode]);
 
+  // Cleanup TTS on unmount
+  useEffect(() => {
+      return () => {
+          if (audioSourceRef.current) {
+              try { audioSourceRef.current.stop(); } catch {}
+          }
+      };
+  }, []);
+
   // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isOpen, isVoiceMode]);
 
-  const handleSendMessage = async (e?: React.FormEvent) => {
+  const handleSendMessage = async (e?: React.FormEvent, overrideText?: string) => {
     e?.preventDefault();
-    if (!inputValue.trim() || !chatSession) return;
+    const textToSend = overrideText || inputValue.trim();
+    if (!textToSend || !chatSession) return;
 
-    const userText = inputValue.trim();
+    playClick();
     setInputValue('');
     
     const newUserMsg: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
-      text: userText,
+      text: textToSend,
       timestamp: new Date()
     };
 
@@ -86,7 +112,7 @@ export const ChatBot: React.FC = () => {
     setIsTyping(true);
 
     try {
-      const result: GenerateContentResponse = await chatSession.sendMessage({ message: userText });
+      const result: GenerateContentResponse = await chatSession.sendMessage({ message: textToSend });
       const responseText = result.text || "I couldn't find an answer to that.";
       
       const sources: WebResource[] = [];
@@ -107,6 +133,7 @@ export const ChatBot: React.FC = () => {
       };
 
       setMessages(prev => [...prev, newBotMsg]);
+      playBubble();
     } catch (error) {
       console.error("Chat Error", error);
       setMessages(prev => [...prev, {
@@ -121,17 +148,63 @@ export const ChatBot: React.FC = () => {
     }
   };
 
+  const handleClearChat = () => {
+      if(window.confirm("Clear chat history?")) {
+          setMessages([
+            {
+                id: 'welcome',
+                role: 'model',
+                text: "Chat cleared. How can I help you now?",
+                timestamp: new Date()
+            }
+          ]);
+          initChat(); // Reset session context
+      }
+  };
+
+  const handleTTS = async (messageId: string, text: string) => {
+      // Stop current playback
+      if (audioSourceRef.current) {
+          try { audioSourceRef.current.stop(); } catch(e) {}
+          audioSourceRef.current = null;
+      }
+
+      // If clicking the same button, just stop (toggle off)
+      if (playingMessageId === messageId) {
+          setPlayingMessageId(null);
+          return;
+      }
+
+      // Start new playback
+      setPlayingMessageId(messageId);
+      try {
+          // Use gemini-2.5-flash-preview-tts model via service
+          const source = await playTextToSpeech(text);
+          audioSourceRef.current = source;
+          
+          source.onended = () => {
+              setPlayingMessageId(null);
+              audioSourceRef.current = null;
+          };
+      } catch (error) {
+          console.error("TTS Error", error);
+          setPlayingMessageId(null);
+          // Optional: Add a toast here if ToastContext was available in this component, 
+          // or just console error since it's a secondary feature.
+      }
+  };
+
   const renderMarkdown = (text: string) => {
     return text.split('\n').map((line, i) => {
         const key = `${i}-${line.substring(0, 10)}`;
         if (line.startsWith('* ') || line.startsWith('- ')) {
-            return <li key={key} className="ml-4 list-disc">{renderBoldAndMath(line.substring(2))}</li>
+            return <li key={key} className="ml-4 list-disc marker:text-indigo-400">{renderBoldAndMath(line.substring(2))}</li>
         }
         if (line.match(/^\d+\./)) {
-             return <div key={key} className="ml-4 mb-1">{renderBoldAndMath(line)}</div>
+             return <div key={key} className="ml-4 mb-1 flex gap-2"><span className="font-bold text-indigo-500">{line.split('.')[0]}.</span><span>{renderBoldAndMath(line.substring(line.indexOf('.') + 1))}</span></div>
         }
         if (line.trim() === '') return <br key={key} />;
-        return <p key={key} className="mb-1">{renderBoldAndMath(line)}</p>;
+        return <p key={key} className="mb-2 last:mb-0">{renderBoldAndMath(line)}</p>;
     });
   };
 
@@ -139,7 +212,7 @@ export const ChatBot: React.FC = () => {
       const parts = text.split(/(\*\*.*?\*\*)/g);
       return parts.map((part, i) => {
           if (part.startsWith('**') && part.endsWith('**')) {
-              return <strong key={i} className="text-indigo-600 dark:text-indigo-300"><MathText text={part.slice(2, -2)} /></strong>;
+              return <strong key={i} className="text-indigo-700 dark:text-indigo-300"><MathText text={part.slice(2, -2)} /></strong>;
           }
           return <MathText key={i} text={part} />;
       });
@@ -148,14 +221,14 @@ export const ChatBot: React.FC = () => {
   return (
     <>
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => { playClick(); setIsOpen(!isOpen); }}
         className={`fixed bottom-6 right-6 z-50 p-4 rounded-full shadow-2xl transition-all duration-300 hover:scale-110 flex items-center justify-center ${isOpen ? 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300' : 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white animate-bounce'}`}
       >
         {isOpen ? <X className="w-6 h-6" /> : <MessageCircle className="w-7 h-7" />}
       </button>
 
       <div 
-        className={`fixed bottom-24 right-6 w-[90vw] md:w-[400px] h-[600px] max-h-[75vh] glass-panel bg-white/80 dark:bg-slate-800/90 backdrop-blur-xl border border-white/50 dark:border-slate-700 rounded-[2rem] shadow-2xl z-50 flex flex-col overflow-hidden transition-all duration-300 origin-bottom-right transform ${isOpen ? 'scale-100 opacity-100' : 'scale-0 opacity-0 pointer-events-none'}`}
+        className={`fixed bottom-24 right-6 w-[90vw] md:w-[400px] h-[600px] max-h-[75vh] glass-panel bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-white/50 dark:border-slate-700 rounded-[2rem] shadow-2xl z-50 flex flex-col overflow-hidden transition-all duration-300 origin-bottom-right transform ${isOpen ? 'scale-100 opacity-100' : 'scale-0 opacity-0 pointer-events-none'}`}
       >
         
         <div className="p-4 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 dark:from-indigo-500/20 dark:to-purple-500/20 border-b border-white/50 dark:border-slate-700 flex items-center justify-between">
@@ -164,7 +237,7 @@ export const ChatBot: React.FC = () => {
                      {isVoiceMode ? <Headphones className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
                  </div>
                  <div>
-                     <h3 className="font-bold text-slate-800 dark:text-white">ReLearn AI</h3>
+                     <h3 className="font-bold text-slate-800 dark:text-white">Synapse AI</h3>
                      <div className="flex items-center gap-1.5">
                          <span className={`w-2 h-2 rounded-full ${isVoiceMode ? 'bg-rose-500' : 'bg-emerald-500'} animate-pulse`}></span>
                          <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wide">
@@ -174,21 +247,29 @@ export const ChatBot: React.FC = () => {
                  </div>
              </div>
              
-             {/* Voice Toggle */}
-             <button 
-                onClick={() => setIsVoiceMode(!isVoiceMode)}
-                className={`p-2 rounded-full transition-all ${isVoiceMode ? 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400' : 'bg-white/50 dark:bg-slate-700/50 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50'}`}
-                title={isVoiceMode ? "End Call" : "Start Voice Call"}
-             >
-                 {isVoiceMode ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-             </button>
+             <div className="flex gap-2">
+                <button 
+                    onClick={handleClearChat}
+                    className="p-2 rounded-full bg-white/50 dark:bg-slate-700/50 text-slate-500 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-all"
+                    title="Clear Chat"
+                >
+                    <Trash2 className="w-4 h-4" />
+                </button>
+                <button 
+                    onClick={() => setIsVoiceMode(!isVoiceMode)}
+                    className={`p-2 rounded-full transition-all ${isVoiceMode ? 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400' : 'bg-white/50 dark:bg-slate-700/50 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                    title={isVoiceMode ? "End Call" : "Start Voice Call"}
+                >
+                    {isVoiceMode ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </button>
+             </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-slate-50/50 dark:bg-slate-900/30 relative">
             
             {/* Voice Mode Overlay */}
             {isVoiceMode && (
-                <div className="absolute inset-0 z-20 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md flex flex-col items-center justify-center animate-in fade-in duration-300">
+                <div className="absolute inset-0 z-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md flex flex-col items-center justify-center animate-in fade-in duration-300">
                     <div className="relative mb-8">
                         {/* Pulsing Rings */}
                         <div className="absolute inset-0 rounded-full bg-indigo-500 opacity-20 animate-ping" style={{ animationDuration: '2s' }}></div>
@@ -223,14 +304,27 @@ export const ChatBot: React.FC = () => {
                     <div 
                         className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed shadow-sm ${
                             msg.role === 'user' 
-                            ? 'bg-indigo-500 text-white rounded-tr-none' 
+                            ? 'bg-indigo-600 text-white rounded-tr-none' 
                             : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-100 dark:border-slate-700 rounded-tl-none'
                         } ${msg.isError ? 'bg-rose-50 border-rose-200 text-rose-600 dark:bg-rose-900/20 dark:border-rose-800 dark:text-rose-400' : ''}`}
                     >
                         {msg.role === 'model' ? (
-                            <div className="prose prose-sm dark:prose-invert max-w-none">
-                                {renderMarkdown(msg.text)}
-                            </div>
+                            <>
+                                <div className="prose prose-sm dark:prose-invert max-w-none">
+                                    {renderMarkdown(msg.text)}
+                                </div>
+                                {!msg.isError && (
+                                    <div className="flex justify-end mt-2 pt-2 border-t border-slate-100 dark:border-slate-700/50">
+                                        <button 
+                                            onClick={() => handleTTS(msg.id, msg.text)}
+                                            className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                                            title="Read Aloud"
+                                        >
+                                            {playingMessageId === msg.id ? <Square className="w-3.5 h-3.5 fill-current" /> : <Volume2 className="w-3.5 h-3.5" />}
+                                        </button>
+                                    </div>
+                                )}
+                            </>
                         ) : (
                             msg.text
                         )}
@@ -257,6 +351,22 @@ export const ChatBot: React.FC = () => {
                     </div>
                 </div>
             ))}
+            
+            {/* Suggested Prompts */}
+            {messages.length === 1 && !isTyping && (
+                <div className="grid grid-cols-2 gap-2 mt-4 animate-in slide-in-from-bottom-2">
+                    {SUGGESTED_PROMPTS.map((prompt, idx) => (
+                        <button 
+                            key={idx}
+                            onClick={() => handleSendMessage(undefined, prompt)}
+                            className="text-left text-xs p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:border-indigo-400 dark:hover:border-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors shadow-sm"
+                        >
+                            {prompt}
+                        </button>
+                    ))}
+                </div>
+            )}
+
             {isTyping && (
                 <div className="flex justify-start">
                     <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl rounded-tl-none border border-slate-100 dark:border-slate-700 shadow-sm flex items-center gap-2">
@@ -275,7 +385,7 @@ export const ChatBot: React.FC = () => {
                     type="text"
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
-                    placeholder="Ask about study tips or search web..."
+                    placeholder="Ask Synapse anything..."
                     disabled={isVoiceMode}
                     className="w-full bg-slate-100 dark:bg-slate-900 border border-transparent focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl pl-4 pr-12 py-3.5 text-sm outline-none transition-all dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
                 />
@@ -287,8 +397,9 @@ export const ChatBot: React.FC = () => {
                     {isTyping ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 </button>
             </form>
-            <p className="text-center text-[10px] text-slate-400 mt-2">
-                ReLearn AI can make mistakes. Verify important info.
+            <p className="text-center text-[10px] text-slate-400 mt-2 flex items-center justify-center gap-1">
+                <Sparkles className="w-3 h-3" />
+                <span>Powered by Gemini 3 Pro</span>
             </p>
         </div>
 

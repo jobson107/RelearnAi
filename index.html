@@ -11,47 +11,18 @@
         darkMode: 'class',
         theme: {
           extend: {
-            colors: {
-              slate: {
-                850: '#151e2e',
-              }
-            },
+            colors: { slate: { 850: '#151e2e' } },
             animation: {
               'blob': 'blob-bounce 10s infinite cubic-bezier(0.4, 0, 0.2, 1)',
               'gradient-bg': 'gradientBG 15s ease infinite',
-              'shimmer': 'shimmer 2s linear infinite',
               'float': 'float 6s ease-in-out infinite',
-              'pulse-glow': 'pulseGlow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-              'fade-in-up': 'fadeInUp 0.5s ease-out forwards',
-              'shake': 'shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both',
               'bounce-slow': 'bounceSlow 3s infinite',
             },
             keyframes: {
-              shimmer: {
-                '0%': { backgroundPosition: '-1000px 0' },
-                '100%': { backgroundPosition: '1000px 0' }
-              },
-              pulseGlow: {
-                '0%, 100%': { opacity: 1, boxShadow: '0 0 20px rgba(139, 92, 246, 0.5)' },
-                '50%': { opacity: .5, boxShadow: '0 0 10px rgba(139, 92, 246, 0.2)' }
-              },
-              float: {
-                '0%, 100%': { transform: 'translateY(0)' },
-                '50%': { transform: 'translateY(-10px)' }
-              },
-              fadeInUp: {
-                '0%': { opacity: 0, transform: 'translateY(20px)' },
-                '100%': { opacity: 1, transform: 'translateY(0)' }
-              },
-              shake: {
-                '0%, 100%': { transform: 'translateX(0)' },
-                '25%': { transform: 'translateX(-5px)' },
-                '75%': { transform: 'translateX(5px)' }
-              },
-              bounceSlow: {
-                '0%, 100%': { transform: 'translateY(0)' },
-                '50%': { transform: 'translateY(-10px)' }
-              }
+              gradientBG: { '0%': { backgroundPosition: '0% 50%' }, '50%': { backgroundPosition: '100% 50%' }, '100%': { backgroundPosition: '0% 50%' } },
+              blob-bounce: { '0%': { transform: 'translate(0, 0) scale(1)' }, '33%': { transform: 'translate(30px, -50px) scale(1.1)' }, '66%': { transform: 'translate(-20px, 20px) scale(0.9)' }, '100%': { transform: 'translate(0, 0) scale(1)' } },
+              float: { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-10px)' } },
+              bounceSlow: { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-10px)' } }
             }
           }
         }
@@ -61,186 +32,22 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
     <style>
-      :root {
-        --color-bg: #f8fafc;
-        --color-glass: rgba(255, 255, 255, 0.65);
-        --color-border: rgba(255, 255, 255, 0.6);
-        --color-shadow: rgba(31, 38, 135, 0.07);
-      }
-      body {
-        font-family: 'Outfit', sans-serif;
-        background-color: var(--color-bg);
-        color: #1e293b;
-        overflow-x: hidden;
-      }
-      h1, h2, h3, h4, h5, h6 {
-        font-family: 'Space Grotesk', sans-serif;
-      }
-      
-      /* Custom Scrollbar - Improved Visibility */
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: transparent; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: rgba(99, 102, 241, 0.2); 
-        border-radius: 10px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: rgba(99, 102, 241, 0.5); 
-      }
-
-      .glass-panel {
-        background: var(--color-glass);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border: 1px solid var(--color-border);
-        box-shadow: 0 8px 32px 0 var(--color-shadow);
-      }
-      
-      .gradient-text {
-        background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 50%, #d946ef 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-size: 200% auto;
-        animation: gradientMove 5s linear infinite;
-      }
-
-      @keyframes gradientMove {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
-      }
-
-      /* 3D Flip Animation */
-      .perspective-1000 {
-        perspective: 1000px;
-      }
-      
-      .flip-card-inner {
-        position: relative;
-        width: 100%;
-        height: 100%;
-        text-align: center;
-        transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-        transform-style: preserve-3d;
-      }
-      
-      .flip-card-front, .flip-card-back {
-        position: absolute;
-        width: 100%;
-        height: 100%;
-        -webkit-backface-visibility: hidden;
-        backface-visibility: hidden;
-        border-radius: 1.5rem;
-      }
-      
-      .flip-card-back {
-        transform: rotateY(180deg);
-      }
-
-      .flipped {
-        transform: rotateY(180deg);
-      }
-
-      /* Animated Background Gradient */
-      .animate-gradient-bg {
-        background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
-        background-size: 400% 400%;
-        animation: gradientBG 15s ease infinite;
-      }
-
-      @keyframes gradientBG {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
-      }
-
-      /* Blob Animations */
-      @keyframes blob-bounce {
-        0% { transform: translate(0, 0) scale(1); }
-        33% { transform: translate(30px, -50px) scale(1.1); }
-        66% { transform: translate(-20px, 20px) scale(0.9); }
-        100% { transform: translate(0, 0) scale(1); }
-      }
-      
-      .animate-blob {
-        animation: blob-bounce 10s infinite cubic-bezier(0.4, 0, 0.2, 1);
-      }
-      .animation-delay-2000 { animation-delay: 2s; }
-      .animation-delay-4000 { animation-delay: 4s; }
-
-      /* Quiz Slide Animation */
-      @keyframes slideInRight {
-        0% { opacity: 0; transform: translateX(20px); }
-        100% { opacity: 1; transform: translateX(0); }
-      }
-      
-      .animate-slide-in {
-        animation: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-      }
-
-      /* PERFORMANCE OPTIMIZATIONS */
-      .optimize-scroll {
-        content-visibility: auto;
-        contain-intrinsic-size: 0 200px;
-        will-change: scroll-position;
-      }
-      
-      .hardware-accelerated {
-        transform: translateZ(0);
-        backface-visibility: hidden;
-      }
-      
-      .skeleton-shimmer {
-        background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 100%);
-        background-size: 1000px 100%;
-        animation: shimmer 2s infinite linear;
-      }
-
-      /* Autofill Fix for Dark Mode */
-      input:-webkit-autofill,
-      input:-webkit-autofill:hover, 
-      input:-webkit-autofill:focus, 
-      input:-webkit-autofill:active{
-          -webkit-box-shadow: 0 0 0 30px white inset !important;
-          -webkit-text-fill-color: #333 !important;
-      }
-      .dark input:-webkit-autofill,
-      .dark input:-webkit-autofill:hover, 
-      .dark input:-webkit-autofill:focus, 
-      .dark input:-webkit-autofill:active{
-          -webkit-box-shadow: 0 0 0 30px #1e293b inset !important;
-          -webkit-text-fill-color: white !important;
-      }
-
-      /* Eraser Animation */
-      @keyframes eraser-wipe {
-        0% { opacity: 1; transform: rotate(0deg) scale(1); }
-        25% { transform: rotate(-5deg) scale(1.05); }
-        50% { transform: rotate(5deg) scale(0.95) skewX(10deg); filter: blur(2px); }
-        100% { opacity: 0; transform: scale(0) rotate(10deg); filter: blur(10px); }
-      }
-
-      .erasing-effect {
-        animation: eraser-wipe 0.6s cubic-bezier(0.55, 0.085, 0.68, 0.53) forwards;
-        pointer-events: none;
-      }
-
-      /* KaTeX Overrides for Dark Mode */
-      .katex {
-        font-size: 1.1em !important;
-        color: inherit !important;
-      }
-      .katex-display {
-        margin: 1em 0 !important;
-        overflow-x: auto;
-        overflow-y: hidden;
-      }
-
+      :root { --color-bg: #f8fafc; --color-glass: rgba(255, 255, 255, 0.65); --color-border: rgba(255, 255, 255, 0.6); --color-shadow: rgba(31, 38, 135, 0.07); }
+      body { font-family: 'Outfit', sans-serif; background-color: var(--color-bg); color: #1e293b; overflow-x: hidden; }
+      h1, h2, h3, h4, h5, h6 { font-family: 'Space Grotesk', sans-serif; }
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.2); border-radius: 10px; }
+      ::-webkit-scrollbar-thumb:hover { background: rgba(99, 102, 241, 0.5); }
+      .glass-panel { background: var(--color-glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--color-border); box-shadow: 0 8px 32px 0 var(--color-shadow); }
+      .gradient-text { background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 50%, #d946ef 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-size: 200% auto; animation: gradientBG 5s linear infinite; }
+      .perspective-1000 { perspective: 1000px; }
+      .flip-card-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); transform-style: preserve-3d; }
+      .flip-card-front, .flip-card-back { position: absolute; width: 100%; height: 100%; -webkit-backface-visibility: hidden; backface-visibility: hidden; border-radius: 1.5rem; }
+      .flip-card-back { transform: rotateY(180deg); }
+      .flipped { transform: rotateY(180deg); }
+      .animate-gradient-bg { background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab); background-size: 400% 400%; animation: gradientBG 15s ease infinite; }
+      .katex { font-size: 1.1em !important; color: inherit !important; }
     </style>
   <script type="importmap">
 {

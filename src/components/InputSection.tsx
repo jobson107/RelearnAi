@@ -51,8 +51,10 @@ export const InputSection: React.FC<InputSectionProps> = ({ onAnalyze, isProcess
       recognition.onresult = (event: any) => {
         let finalTranscript = '';
         for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript;
+          if (event.results[i] && event.results[i].isFinal) {
+            // Safety check for empty alternatives
+            const transcript = (event.results[i][0] && event.results[i][0].transcript) ? event.results[i][0].transcript : '';
+            finalTranscript += transcript;
           }
         }
         if (finalTranscript) {
