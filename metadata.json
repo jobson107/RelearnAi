@@ -1,0 +1,7 @@
+{
+  "name": "ReLearn - The Adaptive AI Tutor",
+  "description": "An immersive educational platform that transforms static notes into interactive learning experiences. Features deep reasoning summarization, visual concept generation, and Socratic quizzing powered by Gemini 3.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
